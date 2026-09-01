@@ -31,7 +31,21 @@ public class KeycloakIdentityProvider(
             await GarantirCpfDisponivelAsync(accessToken, cpfDigits, cancellationToken);
 
             var userId = await CriarUsuarioAsync(accessToken, command, cpfDigits, cancellationToken);
-            return await BuscarClienteCriadoAsync(accessToken, userId, cancellationToken);
+
+            // Não faz uma chamada extra pra "buscar o usuário recém-criado" — o Keycloak já
+            // confirmou a criação (só chegamos aqui se ela deu 201); buscar de novo só pra
+            // montar a resposta criaria uma janela onde o usuário existe no Keycloak mas o
+            // chamador recebe 503 achando que falhou (estado divergente do ponto de vista do
+            // cliente, mesmo sem estado divergente em banco nosso). Os campos da resposta já
+            // são os que nós mesmos mandamos — não há nada que o Keycloak "devolveria de
+            // diferente" que precisássemos ler de volta.
+            return new ClienteResult
+            {
+                Id = userId,
+                Nome = command.Nome,
+                Email = command.Email,
+                CriadoEm = DateTimeOffset.UtcNow,
+            };
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
@@ -110,31 +124,6 @@ public class KeycloakIdentityProvider(
         return location.Segments[^1];
     }
 
-    private async Task<ClienteResult> BuscarClienteCriadoAsync(string accessToken, string userId, CancellationToken cancellationToken)
-    {
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get, $"admin/realms/{_options.Realm}/users/{userId}");
-        request.Headers.Authorization = new("Bearer", accessToken);
-
-        var response = await httpClient.SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new ProvedorIdentidadeIndisponivelException(
-                $"Falha ao buscar usuário recém-criado no Keycloak (HTTP {(int)response.StatusCode}).");
-        }
-
-        var usuario = await response.Content.ReadFromJsonAsync<KeycloakUserRead>(cancellationToken)
-            ?? throw new ProvedorIdentidadeIndisponivelException("Resposta vazia ao buscar usuário criado.");
-
-        return new ClienteResult
-        {
-            Id = usuario.Id,
-            Nome = usuario.FirstName ?? string.Empty,
-            Email = usuario.Email ?? string.Empty,
-            CriadoEm = DateTimeOffset.FromUnixTimeMilliseconds(usuario.CreatedTimestamp),
-        };
-    }
-
     private class KeycloakUserRepresentation
     {
         [JsonPropertyName("username")]
@@ -169,20 +158,5 @@ public class KeycloakIdentityProvider(
 
         [JsonPropertyName("temporary")]
         public bool Temporary { get; set; }
-    }
-
-    private class KeycloakUserRead
-    {
-        [JsonPropertyName("id")]
-        public required string Id { get; set; }
-
-        [JsonPropertyName("email")]
-        public string? Email { get; set; }
-
-        [JsonPropertyName("firstName")]
-        public string? FirstName { get; set; }
-
-        [JsonPropertyName("createdTimestamp")]
-        public long CreatedTimestamp { get; set; }
     }
 }
