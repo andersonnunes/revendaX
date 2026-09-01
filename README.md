@@ -17,9 +17,9 @@ planejamento da atividade acadêmica, não parte da entrega.
 | `vendas-api` | Catálogo de veículos e compras | `5082` (debug direto) |
 | Keycloak | Identity Provider (realm `clientes`, ainda não configurado — ver status abaixo) | `8081` |
 
-> **Status atual**: `identity-api` já implementa o cadastro de cliente (US1.1) — o Keycloak
-> sobe com o realm `clientes` importado (`infra/keycloak/realm-clientes.json`). `vendas-api`
-> e `gateway` ainda são só o esqueleto (build, testes, Docker, health check, roteamento).
+> **Status atual**: `identity-api` implementa o cadastro (US1.1); login (US1.2) é direto no
+> Keycloak; `vendas-api` já valida token via JWKS (US1.3, endpoint `/whoami` de diagnóstico).
+> `gateway` ainda é só o esqueleto (build, testes, Docker, roteamento).
 
 ## Como rodar localmente
 
@@ -103,6 +103,29 @@ erradas ou e-mail não cadastrado → 401. Renovar sem logar de novo:
 `grant_type=refresh_token&refresh_token={refresh_token}&client_id=vendas-frontend` no mesmo
 endpoint.
 
+## Testar a validação de token (US1.3)
+
+`vendas-api` valida o token via JWKS — `GET /whoami` (qualquer usuário autenticado) e
+`GET /whoami/cliente` (exige a role `cliente`) são endpoints de diagnóstico, sem regra de
+negócio real ainda:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8081/realms/clientes/protocol/openid-connect/token \
+  -d "grant_type=password" -d "client_id=vendas-frontend" \
+  -d "username=maria@example.com" -d "password=SenhaForte123" | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+
+curl http://localhost:8080/vendas/whoami -H "Authorization: Bearer $TOKEN"
+# 200 — { "sub": "...", "email": "...", "roles": ["cliente", ...] }
+
+curl -o /dev/null -w "%{http_code}\n" http://localhost:8080/vendas/whoami
+# 401 — sem token
+```
+
+> Sem `KC_HOSTNAME` fixo no Keycloak (já configurado em `infra/docker-compose.yml`), o `iss`
+> do token variaria conforme o host/porta usado pra logar (ex.: `localhost:8081`, a porta
+> externa), enquanto `vendas-api` valida via hostname interno do Docker (`keycloak:8080`) —
+> os dois nunca bateriam e todo token seria rejeitado como "issuer inválido".
+
 ## Como testar
 
 ```bash
@@ -113,8 +136,10 @@ Cada serviço tem seu(s) projeto(s) de teste em `tests/`. `identity-api` tem doi
 `IdentityApi.Domain.Tests` (unitário, `CpfValidator`, sem infraestrutura) e `IdentityApi.Tests`
 (integração — sobe um **Keycloak real e efêmero via Testcontainers**, com o mesmo
 `realm-clientes.json` importado; cobre cadastro (`POST /clientes`, não mocka a Admin API) e
-login (direto no Keycloak, ROPC via `vendas-frontend`) de ponta a ponta). `vendas-api`/
-`gateway` ainda só cobrem o esqueleto (`GET /health`).
+login (direto no Keycloak, ROPC via `vendas-frontend`) de ponta a ponta). `vendas-api.Tests`
+segue o mesmo padrão (Keycloak real via Testcontainers) e cobre a validação de token
+(`/whoami`, `/whoami/cliente`) — token válido, sem token, assinatura adulterada, e com/sem a
+role `cliente`. `gateway` ainda só cobre o esqueleto (`GET /health`).
 
 ## Estrutura
 
