@@ -12,6 +12,12 @@ public static class DependencyInjection
     {
         services.Configure<KeycloakOptions>(configuration.GetSection(KeycloakOptions.SectionName));
 
+        services.AddHttpClient<IKeycloakTokenProvider, KeycloakTokenProvider>((serviceProvider, client) =>
+        {
+            var keycloakOptions = serviceProvider.GetRequiredService<IOptions<KeycloakOptions>>().Value;
+            client.BaseAddress = new Uri(keycloakOptions.BaseUrl);
+        });
+
         services.AddHttpClient<IIdentityProvider, KeycloakIdentityProvider>((serviceProvider, client) =>
         {
             var keycloakOptions = serviceProvider.GetRequiredService<IOptions<KeycloakOptions>>().Value;

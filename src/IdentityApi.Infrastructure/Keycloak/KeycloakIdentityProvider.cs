@@ -15,7 +15,8 @@ namespace IdentityApi.Infrastructure.Keycloak;
 /// `identity-api`, ver ADR-0001 e docs/refinamentos/US1.1-cadastro-cliente.md, fora deste
 /// repositório).
 /// </summary>
-public class KeycloakIdentityProvider(HttpClient httpClient, IOptions<KeycloakOptions> options)
+public class KeycloakIdentityProvider(
+    HttpClient httpClient, IOptions<KeycloakOptions> options, IKeycloakTokenProvider tokenProvider)
     : IIdentityProvider
 {
     private readonly KeycloakOptions _options = options.Value;
@@ -24,7 +25,7 @@ public class KeycloakIdentityProvider(HttpClient httpClient, IOptions<KeycloakOp
     {
         try
         {
-            var accessToken = await GetServiceAccountTokenAsync(cancellationToken);
+            var accessToken = await tokenProvider.GetServiceAccountTokenAsync(cancellationToken);
             var cpfDigits = CpfValidator.OnlyDigits(command.Cpf);
 
             await GarantirCpfDisponivelAsync(accessToken, cpfDigits, cancellationToken);
@@ -37,29 +38,6 @@ public class KeycloakIdentityProvider(HttpClient httpClient, IOptions<KeycloakOp
             throw new ProvedorIdentidadeIndisponivelException(
                 "Não foi possível falar com o provedor de identidade.", ex);
         }
-    }
-
-    private async Task<string> GetServiceAccountTokenAsync(CancellationToken cancellationToken)
-    {
-        var form = new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["grant_type"] = "client_credentials",
-            ["client_id"] = _options.ClientId,
-            ["client_secret"] = _options.ClientSecret,
-        });
-
-        var response = await httpClient.PostAsync(
-            $"realms/{_options.Realm}/protocol/openid-connect/token", form, cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new ProvedorIdentidadeIndisponivelException(
-                $"Falha ao autenticar client de serviço no Keycloak (HTTP {(int)response.StatusCode}).");
-        }
-
-        var token = await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken);
-        return token?.AccessToken
-            ?? throw new ProvedorIdentidadeIndisponivelException("Resposta de token do Keycloak sem access_token.");
     }
 
     private async Task GarantirCpfDisponivelAsync(string accessToken, string cpfDigits, CancellationToken cancellationToken)
@@ -155,12 +133,6 @@ public class KeycloakIdentityProvider(HttpClient httpClient, IOptions<KeycloakOp
             Email = usuario.Email ?? string.Empty,
             CriadoEm = DateTimeOffset.FromUnixTimeMilliseconds(usuario.CreatedTimestamp),
         };
-    }
-
-    private class TokenResponse
-    {
-        [JsonPropertyName("access_token")]
-        public string? AccessToken { get; set; }
     }
 
     private class KeycloakUserRepresentation
