@@ -17,9 +17,9 @@ planejamento da atividade acadêmica, não parte da entrega.
 | `vendas-api` | Catálogo de veículos e compras | `5082` (debug direto) |
 | Keycloak | Identity Provider (realm `clientes`, ainda não configurado — ver status abaixo) | `8081` |
 
-> **Status atual**: só o esqueleto dos serviços existe (build, testes, Docker, health check,
-> roteamento). Nenhuma regra de negócio foi implementada ainda — o Keycloak sobe "puro", sem
-> o realm `clientes` importado.
+> **Status atual**: `identity-api` já implementa o cadastro de cliente (US1.1) — o Keycloak
+> sobe com o realm `clientes` importado (`infra/keycloak/realm-clientes.json`). `vendas-api`
+> e `gateway` ainda são só o esqueleto (build, testes, Docker, health check, roteamento).
 
 ## Como rodar localmente
 
@@ -39,7 +39,10 @@ dotnet run --project src/Gateway       # http://localhost:5083 (porta do launchS
 Rodando assim (sem Docker), o `Gateway` não encontra `identity-api`/`vendas-api` nos
 hostnames de container — sobrescreva os destinos do YARP via env var, ex.:
 `ReverseProxy__Clusters__identity-cluster__Destinations__destination1__Address=http://localhost:5081/`
-(ver comentário em `src/Gateway/appsettings.json`).
+(ver comentário em `src/Gateway/appsettings.json`). Do mesmo jeito, `IdentityApi` sozinho
+precisa de um Keycloak acessível e do client secret — se estiver usando o Keycloak do
+`docker-compose` (porta `8081`) enquanto roda o `identity-api` fora de container:
+`Keycloak__BaseUrl=http://localhost:8081 Keycloak__ClientSecret=dev-identity-api-secret dotnet run --project src/IdentityApi`.
 
 Cada serviço expõe `/health` (200 OK) e, em `Development`, a documentação da API via Scalar
 em `/scalar`.
@@ -54,15 +57,37 @@ docker compose -f infra/docker-compose.yml up --build
 #                  http://localhost:8080/vendas/health
 ```
 
+## Testar o cadastro de cliente (US1.1)
+
+Com a stack no ar (`docker compose up`, acima):
+
+```bash
+curl -X POST http://localhost:8080/identity/clientes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nome": "Maria Silva",
+    "email": "maria@example.com",
+    "cpf": "529.982.247-25",
+    "senha": "SenhaForte123",
+    "telefone": "11999990000"
+  }'
+# 201 Created — { "id": "...", "nome": "Maria Silva", "email": "maria@example.com", "criadoEm": "..." }
+```
+
+E-mail ou CPF repetido → 409; e-mail malformado ou senha curta → 400; CPF com dígito
+verificador inválido → 422.
+
 ## Como testar
 
 ```bash
 dotnet test
 ```
 
-Cada serviço tem seu projeto de teste correspondente em `tests/` (`IdentityApi.Tests`,
-`VendasApi.Tests`, `Gateway.Tests`). Por enquanto, cobrem só o esqueleto (`GET /health`) — a
-cobertura de regra de negócio entra junto de cada funcionalidade.
+Cada serviço tem seu(s) projeto(s) de teste em `tests/`. `identity-api` tem dois:
+`IdentityApi.Domain.Tests` (unitário, `CpfValidator`, sem infraestrutura) e `IdentityApi.Tests`
+(integração — sobe um **Keycloak real e efêmero via Testcontainers**, com o mesmo
+`realm-clientes.json` importado, e exercita `POST /clientes` de verdade contra ele; não
+mocka a Admin API). `vendas-api`/`gateway` ainda só cobrem o esqueleto (`GET /health`).
 
 ## Estrutura
 
@@ -71,15 +96,20 @@ revendaX/
 ├── global.json              # versão do SDK .NET pinada
 ├── revendaX.slnx
 ├── src/
-│   ├── Gateway/              # YARP — porta única de entrada
-│   ├── IdentityApi/
+│   ├── Gateway/                    # YARP — porta única de entrada
+│   ├── IdentityApi/                 # host web — Controllers, Program.cs
+│   ├── IdentityApi.Application/     # casos de uso, comandos/resultados, portas
+│   ├── IdentityApi.Domain/          # regra de CPF, exceções de negócio (zero dependências)
+│   ├── IdentityApi.Infrastructure/  # implementação contra a Admin REST API do Keycloak
 │   └── VendasApi/
 ├── tests/
 │   ├── Gateway.Tests/
-│   ├── IdentityApi.Tests/
+│   ├── IdentityApi.Domain.Tests/    # unitário
+│   ├── IdentityApi.Tests/           # integração (Keycloak real via Testcontainers)
 │   └── VendasApi.Tests/
 ├── infra/
-│   └── docker-compose.yml
+│   ├── docker-compose.yml
+│   └── keycloak/realm-clientes.json  # realm `clientes` exportado (US1.1)
 ├── docs/
 │   ├── architecture.md
 │   └── adr/
