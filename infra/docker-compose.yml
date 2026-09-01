@@ -1,13 +1,29 @@
 # Ambiente de desenvolvimento local. Rodar a partir da raiz do repositório:
 #   docker compose -f infra/docker-compose.yml up --build
 #
-# Escopo desta US0: só o esqueleto sobe (identity-api, vendas-api, Keycloak "puro" sem o
-# realm `clientes` importado ainda, e os bancos de cada serviço). Configurar o realm do
-# Keycloak é responsabilidade da US1.1 (ver fase3/docs/refinamentos/US1.1-cadastro-cliente.md,
-# fora deste repositório).
+# Ponto de entrada único: gateway (porta 8080), que roteia /identity/** para identity-api e
+# /vendas/** para vendas-api (YARP, ver src/Gateway/appsettings.json). identity-api e
+# vendas-api também têm porta própria exposta, só para debug direto sem passar pelo gateway.
+#
+# Escopo desta US0: só o esqueleto sobe (os 3 serviços .NET, Keycloak "puro" sem o realm
+# `clientes` importado ainda, e os bancos de cada serviço). Configurar o realm do Keycloak é
+# responsabilidade da US1.1 (ver fase3/docs/refinamentos/US1.1-cadastro-cliente.md, fora
+# deste repositório).
 name: revendax
 
 services:
+  gateway:
+    build:
+      context: ..
+      dockerfile: src/Gateway/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "8080:8080"
+    depends_on:
+      - identity-api
+      - vendas-api
+
   identity-api:
     build:
       context: ..
@@ -15,7 +31,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
     ports:
-      - "5081:8080"
+      - "5081:8080" # exposta à parte para debug direto; o acesso "oficial" é via gateway
     depends_on:
       - keycloak
 
@@ -26,7 +42,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
     ports:
-      - "5082:8080"
+      - "5082:8080" # exposta à parte para debug direto; o acesso "oficial" é via gateway
     depends_on:
       vendas-db:
         condition: service_healthy
