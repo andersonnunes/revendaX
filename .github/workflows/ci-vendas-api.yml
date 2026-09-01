@@ -1,37 +1,52 @@
 name: CI - vendas-api
 
+# Sem "paths:" no trigger — o job roda em todo PR, para sempre reportar um status check
+# (required em branch protection não pode depender de path, senão PRs que não tocam este
+# serviço ficam travados esperando um check que nunca dispara). O filtro de path abaixo só
+# decide se o trabalho pesado (build/test/scan) roda ou é pulado.
 on:
   pull_request:
-    paths:
-      - "src/VendasApi/**"
-      - "tests/VendasApi.Tests/**"
-      - "revendaX.slnx"
-      - "global.json"
-      - ".github/workflows/ci-vendas-api.yml"
 
 jobs:
-  build-test:
+  build-test-vendas-api:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - "src/VendasApi/**"
+              - "tests/VendasApi.Tests/**"
+              - "revendaX.slnx"
+              - "global.json"
+              - ".github/workflows/ci-vendas-api.yml"
+
       - uses: actions/setup-dotnet@v4
+        if: steps.filter.outputs.relevant == 'true'
         with:
           global-json-file: global.json
 
       - name: Restore
+        if: steps.filter.outputs.relevant == 'true'
         run: dotnet restore src/VendasApi/VendasApi.csproj
 
       - name: Build
+        if: steps.filter.outputs.relevant == 'true'
         run: dotnet build src/VendasApi/VendasApi.csproj --no-restore -c Release
 
       - name: Test
+        if: steps.filter.outputs.relevant == 'true'
         run: dotnet test tests/VendasApi.Tests/VendasApi.Tests.csproj -c Release
 
       - name: Build Docker image
+        if: steps.filter.outputs.relevant == 'true'
         run: docker build -f src/VendasApi/Dockerfile -t vendas-api:ci .
 
       - name: Scan image (Trivy)
+        if: steps.filter.outputs.relevant == 'true'
         uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: vendas-api:ci
