@@ -5,7 +5,6 @@ namespace IdentityApi.Application.Clientes;
 /// <summary>
 /// Comando de entrada do caso de uso "criar cliente" — é também o corpo esperado em
 /// POST /clientes; o controller faz o bind direto nisso, sem um DTO HTTP intermediário.
-/// Ver fase3/docs/refinamentos/US1.1-cadastro-cliente.md (fora deste repositório).
 /// </summary>
 public class CriarClienteCommand
 {

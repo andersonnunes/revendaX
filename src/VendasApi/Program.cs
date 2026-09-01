@@ -23,7 +23,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Usado pelo pipeline de CD para confirmar que o deploy subiu (ver docs/refinamentos/US0).
+// Usado para confirmar que o container subiu corretamente (docker-compose healthcheck manual).
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "vendas-api" }));
 
 app.Run();

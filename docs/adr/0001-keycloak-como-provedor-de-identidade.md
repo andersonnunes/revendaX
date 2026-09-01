@@ -38,7 +38,6 @@ qualquer outro realm que venha a existir.
 
 **Negativas / trade-offs aceitos:**
 - CPF não é campo nativo do Keycloak — vira *user attribute* customizado, e sua unicidade
-  precisa ser checada pela aplicação (`identity-api`), não pelo Keycloak (ver US1.1 em
-  `fase3/docs/refinamentos/US1.1-cadastro-cliente.md`, fora deste repositório).
+  precisa ser checada pela aplicação (`identity-api`), não pelo Keycloak.
 - Um serviço a mais para operar (Keycloak + seu próprio Postgres) além dos serviços de
   domínio — aceito porque é exatamente o isolamento que o enunciado pede.

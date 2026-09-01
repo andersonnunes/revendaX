@@ -8,7 +8,7 @@ namespace IdentityApi.Application.Clientes;
 /// Orquestra o cadastro: valida a regra de negócio do CPF (dígito verificador) antes de
 /// delegar ao provedor de identidade — a checagem de duplicidade (e-mail/CPF já cadastrados)
 /// é responsabilidade da implementação de <see cref="IIdentityProvider"/>, não deste caso de
-/// uso (ver fase3/docs/refinamentos/US1.1-cadastro-cliente.md, fora deste repositório).
+/// uso.
 /// </summary>
 public class CriarClienteUseCase(IIdentityProvider identityProvider) : ICriarClienteUseCase
 {

@@ -12,8 +12,7 @@ namespace IdentityApi.Infrastructure.Keycloak;
 /// <summary>
 /// Implementação de <see cref="IIdentityProvider"/> contra a Admin REST API do Keycloak.
 /// Único ponto do sistema com credencial de escrita no Keycloak (client de serviço
-/// `identity-api`, ver ADR-0001 e docs/refinamentos/US1.1-cadastro-cliente.md, fora deste
-/// repositório).
+/// `identity-api`, ver ADR-0001).
 /// </summary>
 public class KeycloakIdentityProvider(
     HttpClient httpClient, IOptions<KeycloakOptions> options, IKeycloakTokenProvider tokenProvider)
