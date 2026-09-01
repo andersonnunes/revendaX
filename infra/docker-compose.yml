@@ -1,0 +1,80 @@
+# Ambiente de desenvolvimento local. Rodar a partir da raiz do repositório:
+#   docker compose -f infra/docker-compose.yml up --build
+#
+# Escopo desta US0: só o esqueleto sobe (identity-api, vendas-api, Keycloak "puro" sem o
+# realm `clientes` importado ainda, e os bancos de cada serviço). Configurar o realm do
+# Keycloak é responsabilidade da US1.1 (ver fase3/docs/refinamentos/US1.1-cadastro-cliente.md,
+# fora deste repositório).
+name: revendax
+
+services:
+  identity-api:
+    build:
+      context: ..
+      dockerfile: src/IdentityApi/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5081:8080"
+    depends_on:
+      - keycloak
+
+  vendas-api:
+    build:
+      context: ..
+      dockerfile: src/VendasApi/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "5082:8080"
+    depends_on:
+      vendas-db:
+        condition: service_healthy
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: start-dev
+    environment:
+      - KC_BOOTSTRAP_ADMIN_USERNAME=admin
+      - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://keycloak-db:5432/keycloak
+      - KC_DB_USERNAME=keycloak
+      - KC_DB_PASSWORD=keycloak
+    ports:
+      - "8081:8080"
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+
+  keycloak-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER=keycloak
+      - POSTGRES_PASSWORD=keycloak
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  vendas-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=vendas
+      - POSTGRES_USER=vendas
+      - POSTGRES_PASSWORD=vendas
+    volumes:
+      - vendas-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vendas"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  keycloak-db-data:
+  vendas-db-data:
