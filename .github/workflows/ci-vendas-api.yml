@@ -33,6 +33,10 @@ jobs:
         if: steps.filter.outputs.relevant == 'true'
         run: dotnet restore src/VendasApi/VendasApi.csproj
 
+      - name: Lint (dotnet format)
+        if: steps.filter.outputs.relevant == 'true'
+        run: dotnet format src/VendasApi/VendasApi.csproj --verify-no-changes
+
       - name: Build
         if: steps.filter.outputs.relevant == 'true'
         run: dotnet build src/VendasApi/VendasApi.csproj --no-restore -c Release

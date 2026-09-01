@@ -33,6 +33,10 @@ jobs:
         if: steps.filter.outputs.relevant == 'true'
         run: dotnet restore src/Gateway/Gateway.csproj
 
+      - name: Lint (dotnet format)
+        if: steps.filter.outputs.relevant == 'true'
+        run: dotnet format src/Gateway/Gateway.csproj --verify-no-changes
+
       - name: Build
         if: steps.filter.outputs.relevant == 'true'
         run: dotnet build src/Gateway/Gateway.csproj --no-restore -c Release
