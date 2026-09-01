@@ -57,6 +57,13 @@ docker compose -f infra/docker-compose.yml up --build
 #                  http://localhost:8080/vendas/health
 ```
 
+> **Importante**: o Keycloak só reimporta `infra/keycloak/realm-clientes.json` se o realm
+> `clientes` **ainda não existir** no Postgres dele — como `keycloak-db-data` é um volume
+> persistente, um `docker compose up` depois de uma mudança no realm (novo client, nova role
+> etc.) **não aplica a mudança** silenciosamente. Depois de editar o realm, suba com
+> `docker compose -f infra/docker-compose.yml down -v && docker compose -f
+> infra/docker-compose.yml up --build` para forçar reimportação limpa.
+
 ## Testar o cadastro de cliente (US1.1)
 
 Com a stack no ar (`docker compose up`, acima):
@@ -77,6 +84,25 @@ curl -X POST http://localhost:8080/identity/clientes \
 E-mail ou CPF repetido → 409; e-mail malformado ou senha curta → 400; CPF com dígito
 verificador inválido → 422.
 
+## Testar o login (US1.2)
+
+Login é **direto no Keycloak** — não passa pelo `identity-api` nem pelo `gateway` (porta
+`8081`, exposta pelo `docker-compose`, não `8080`):
+
+```bash
+curl -X POST http://localhost:8081/realms/clientes/protocol/openid-connect/token \
+  -d "grant_type=password" \
+  -d "client_id=vendas-frontend" \
+  -d "username=maria@example.com" \
+  -d "password=SenhaForte123"
+# 200 — { "access_token": "...", "expires_in": 300, "refresh_token": "...", ... }
+```
+
+O `sub` dentro do `access_token` (JWT) é o mesmo `id` retornado no cadastro. Credenciais
+erradas ou e-mail não cadastrado → 401. Renovar sem logar de novo:
+`grant_type=refresh_token&refresh_token={refresh_token}&client_id=vendas-frontend` no mesmo
+endpoint.
+
 ## Como testar
 
 ```bash
@@ -86,8 +112,9 @@ dotnet test
 Cada serviço tem seu(s) projeto(s) de teste em `tests/`. `identity-api` tem dois:
 `IdentityApi.Domain.Tests` (unitário, `CpfValidator`, sem infraestrutura) e `IdentityApi.Tests`
 (integração — sobe um **Keycloak real e efêmero via Testcontainers**, com o mesmo
-`realm-clientes.json` importado, e exercita `POST /clientes` de verdade contra ele; não
-mocka a Admin API). `vendas-api`/`gateway` ainda só cobrem o esqueleto (`GET /health`).
+`realm-clientes.json` importado; cobre cadastro (`POST /clientes`, não mocka a Admin API) e
+login (direto no Keycloak, ROPC via `vendas-frontend`) de ponta a ponta). `vendas-api`/
+`gateway` ainda só cobrem o esqueleto (`GET /health`).
 
 ## Estrutura
 
