@@ -5,8 +5,8 @@ using IdentityApi.Application.Clientes;
 namespace IdentityApi.Tests.Integration;
 
 /// <summary>
-/// Cenários de teste da US1.1 (ver fase3/docs/refinamentos/US1.1-cadastro-cliente.md, fora
-/// deste repositório) contra um Keycloak real efêmero — não mockado.
+/// Cenários de teste do cadastro de cliente (`POST /clientes`) contra um Keycloak real
+/// efêmero — não mockado.
 /// </summary>
 public class ClientesControllerTests : IClassFixture<KeycloakContainerFixture>, IAsyncLifetime
 {
@@ -36,7 +36,7 @@ public class ClientesControllerTests : IClassFixture<KeycloakContainerFixture>, 
     [Fact]
     public async Task Criar_DadosValidos_Retorna201ComIdGerado()
     {
-        var request = NovoRequestValido();
+        var request = TestData.NovoClienteValido();
 
         var response = await _client.PostAsJsonAsync("/clientes", request);
 
@@ -50,11 +50,11 @@ public class ClientesControllerTests : IClassFixture<KeycloakContainerFixture>, 
     [Fact]
     public async Task Criar_EmailDuplicado_Retorna409()
     {
-        var request = NovoRequestValido();
+        var request = TestData.NovoClienteValido();
         var primeira = await _client.PostAsJsonAsync("/clientes", request);
         Assert.Equal(HttpStatusCode.Created, primeira.StatusCode);
 
-        var segunda = await _client.PostAsJsonAsync("/clientes", request with { Cpf = GerarCpfValido() });
+        var segunda = await _client.PostAsJsonAsync("/clientes", request with { Cpf = TestData.GerarCpfValido() });
 
         Assert.Equal(HttpStatusCode.Conflict, segunda.StatusCode);
     }
@@ -62,11 +62,11 @@ public class ClientesControllerTests : IClassFixture<KeycloakContainerFixture>, 
     [Fact]
     public async Task Criar_CpfDuplicado_Retorna409()
     {
-        var cpf = GerarCpfValido();
-        var primeira = await _client.PostAsJsonAsync("/clientes", NovoRequestValido() with { Cpf = cpf });
+        var cpf = TestData.GerarCpfValido();
+        var primeira = await _client.PostAsJsonAsync("/clientes", TestData.NovoClienteValido() with { Cpf = cpf });
         Assert.Equal(HttpStatusCode.Created, primeira.StatusCode);
 
-        var segunda = await _client.PostAsJsonAsync("/clientes", NovoRequestValido() with { Cpf = cpf });
+        var segunda = await _client.PostAsJsonAsync("/clientes", TestData.NovoClienteValido() with { Cpf = cpf });
 
         Assert.Equal(HttpStatusCode.Conflict, segunda.StatusCode);
     }
@@ -74,7 +74,7 @@ public class ClientesControllerTests : IClassFixture<KeycloakContainerFixture>, 
     [Fact]
     public async Task Criar_EmailMalformado_Retorna400()
     {
-        var response = await _client.PostAsJsonAsync("/clientes", NovoRequestValido() with { Email = "não-é-um-email" });
+        var response = await _client.PostAsJsonAsync("/clientes", TestData.NovoClienteValido() with { Email = "não-é-um-email" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -82,7 +82,7 @@ public class ClientesControllerTests : IClassFixture<KeycloakContainerFixture>, 
     [Fact]
     public async Task Criar_SenhaFraca_Retorna400()
     {
-        var response = await _client.PostAsJsonAsync("/clientes", NovoRequestValido() with { Senha = "curta" });
+        var response = await _client.PostAsJsonAsync("/clientes", TestData.NovoClienteValido() with { Senha = "curta" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -92,7 +92,7 @@ public class ClientesControllerTests : IClassFixture<KeycloakContainerFixture>, 
     {
         // Dígitos distintos (não cai na regra "todos iguais") mas dígito verificador errado —
         // exercita de fato o cálculo do dígito, não só a rejeição mais óbvia.
-        var response = await _client.PostAsJsonAsync("/clientes", NovoRequestValido() with { Cpf = "123.456.789-99" });
+        var response = await _client.PostAsJsonAsync("/clientes", TestData.NovoClienteValido() with { Cpf = "123.456.789-99" });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -100,7 +100,7 @@ public class ClientesControllerTests : IClassFixture<KeycloakContainerFixture>, 
     [Fact]
     public async Task Criar_SenhaNuncaApareceNaResposta()
     {
-        var request = NovoRequestValido();
+        var request = TestData.NovoClienteValido();
 
         var response = await _client.PostAsJsonAsync("/clientes", request);
 
@@ -111,7 +111,7 @@ public class ClientesControllerTests : IClassFixture<KeycloakContainerFixture>, 
     [Fact]
     public async Task Criar_SenhaNuncaApareceEmNenhumLog()
     {
-        var request = NovoRequestValido();
+        var request = TestData.NovoClienteValido();
 
         var response = await _client.PostAsJsonAsync("/clientes", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -123,44 +123,4 @@ public class ClientesControllerTests : IClassFixture<KeycloakContainerFixture>, 
         var logsComSenha = _factory.CapturedLogMessages.Where(m => m.Contains(request.Senha)).ToList();
         Assert.Empty(logsComSenha);
     }
-
-    private static ClienteRequestDto NovoRequestValido() => new(
-        Nome: "Maria Silva",
-        Email: $"maria.{Guid.NewGuid():N}@example.com",
-        Cpf: GerarCpfValido(),
-        Senha: "SenhaForte123",
-        Telefone: "11999990000");
-
-    /// <summary>
-    /// Gera um CPF com dígitos verificadores válidos para uso nos testes — não reaproveita
-    /// IdentityApi.Domain.Validation.CpfValidator (que só valida, não gera); é geração de
-    /// massa de teste, não a lógica sendo testada.
-    /// </summary>
-    private static string GerarCpfValido()
-    {
-        var random = Random.Shared;
-        int[] digits;
-        do
-        {
-            digits = Enumerable.Range(0, 9).Select(_ => random.Next(0, 10)).ToArray();
-        } while (digits.Distinct().Count() == 1);
-
-        var d1 = CalcularDigito(digits, 9);
-        var d2 = CalcularDigito([.. digits, d1], 10);
-        return string.Concat(digits) + d1 + d2;
-    }
-
-    private static int CalcularDigito(int[] numbers, int length)
-    {
-        var sum = 0;
-        for (var i = 0; i < length; i++)
-        {
-            sum += numbers[i] * (length + 1 - i);
-        }
-
-        var remainder = sum % 11;
-        return remainder < 2 ? 0 : 11 - remainder;
-    }
-
-    private record ClienteRequestDto(string Nome, string Email, string Cpf, string Senha, string? Telefone);
 }
