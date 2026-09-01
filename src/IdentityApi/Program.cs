@@ -1,4 +1,5 @@
 using IdentityApi.Application;
+using IdentityApi.ExceptionHandling;
 using IdentityApi.Infrastructure;
 using Scalar.AspNetCore;
 
@@ -13,6 +14,11 @@ builder.Services.AddOpenApi();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
+// Mapeia exceções de negócio (Domain) para status HTTP num único lugar — ver
+// ExceptionHandling/DomainExceptionHandler.cs.
+builder.Services.AddExceptionHandler<DomainExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -21,6 +27,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
+
+app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
 
