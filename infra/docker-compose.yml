@@ -6,9 +6,14 @@
 # vendas-api também têm porta própria exposta, só para debug direto sem passar pelo gateway.
 #
 # O Keycloak sobe com o realm `clientes` importado automaticamente
-# (infra/keycloak/realm-clientes.json, ver docs/refinamentos/US1.1-cadastro-cliente.md, fora
-# deste repositório) — client `identity-api` (confidencial, service account com
-# manage-users) e os user attributes customizados (cpf, telefone) já configurados.
+# (infra/keycloak/realm-clientes.json) — client `identity-api` (confidencial, service account
+# com manage-users), client público `vendas-frontend` (login via ROPC), role `cliente`
+# (default role) e os user attributes customizados (cpf, telefone) já configurados.
+#
+# IMPORTANTE: o Keycloak só reimporta esse arquivo se o realm ainda não existir no Postgres
+# dele (keycloak-db-data). Depois de editar o realm, use `docker compose down -v` antes do
+# próximo `up` — senão a mudança é ignorada silenciosamente (o volume persiste a versão
+# antiga).
 name: revendax
 
 services:
