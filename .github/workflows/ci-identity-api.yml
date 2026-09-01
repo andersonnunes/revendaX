@@ -19,7 +19,12 @@ jobs:
           filters: |
             relevant:
               - "src/IdentityApi/**"
+              - "src/IdentityApi.Domain/**"
+              - "src/IdentityApi.Application/**"
+              - "src/IdentityApi.Infrastructure/**"
               - "tests/IdentityApi.Tests/**"
+              - "tests/IdentityApi.Domain.Tests/**"
+              - "infra/keycloak/realm-clientes.json"
               - "revendaX.slnx"
               - "global.json"
               - ".github/workflows/ci-identity-api.yml"
@@ -37,7 +42,11 @@ jobs:
         if: steps.filter.outputs.relevant == 'true'
         run: dotnet build src/IdentityApi/IdentityApi.csproj --no-restore -c Release
 
-      - name: Test
+      - name: Test (Domain — unitário)
+        if: steps.filter.outputs.relevant == 'true'
+        run: dotnet test tests/IdentityApi.Domain.Tests/IdentityApi.Domain.Tests.csproj -c Release
+
+      - name: Test (integração — Keycloak real via Testcontainers)
         if: steps.filter.outputs.relevant == 'true'
         run: dotnet test tests/IdentityApi.Tests/IdentityApi.Tests.csproj -c Release
 
