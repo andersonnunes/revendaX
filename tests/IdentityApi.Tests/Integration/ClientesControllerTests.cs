@@ -90,7 +90,9 @@ public class ClientesControllerTests : IClassFixture<KeycloakContainerFixture>, 
     [Fact]
     public async Task Criar_CpfComDigitoVerificadorInvalido_Retorna422()
     {
-        var response = await _client.PostAsJsonAsync("/clientes", NovoRequestValido() with { Cpf = "111.111.111-11" });
+        // Dígitos distintos (não cai na regra "todos iguais") mas dígito verificador errado —
+        // exercita de fato o cálculo do dígito, não só a rejeição mais óbvia.
+        var response = await _client.PostAsJsonAsync("/clientes", NovoRequestValido() with { Cpf = "123.456.789-99" });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -104,6 +106,22 @@ public class ClientesControllerTests : IClassFixture<KeycloakContainerFixture>, 
 
         var corpo = await response.Content.ReadAsStringAsync();
         Assert.DoesNotContain(request.Senha, corpo);
+    }
+
+    [Fact]
+    public async Task Criar_SenhaNuncaApareceEmNenhumLog()
+    {
+        var request = NovoRequestValido();
+
+        var response = await _client.PostAsJsonAsync("/clientes", request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        // Sanidade: se isso for 0, a captura de log não está funcionando e o teste abaixo
+        // passaria por motivo errado (nada logado, não "nada com a senha logado").
+        Assert.NotEmpty(_factory.CapturedLogMessages);
+
+        var logsComSenha = _factory.CapturedLogMessages.Where(m => m.Contains(request.Senha)).ToList();
+        Assert.Empty(logsComSenha);
     }
 
     private static ClienteRequestDto NovoRequestValido() => new(
