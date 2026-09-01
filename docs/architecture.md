@@ -47,6 +47,8 @@ C4Container
     Person(vendedor, "Vendedor/Administrador")
 
     System_Boundary(plataforma, "Plataforma de Revenda de Veículos") {
+        Container(gateway, "gateway", "YARP (.NET 10)", "Porta única de entrada — roteia /identity/** e /vendas/**")
+
         Container(identityApi, "identity-api", ".NET 10", "Cadastro de clientes — única credencial com permissão de escrita no Keycloak")
         Container(keycloak, "Keycloak", "Keycloak (self-hosted)", "Identity Provider — realm `clientes`; emite e permite validar JWT")
         ContainerDb(keycloakDb, "Postgres (Keycloak)", "PostgreSQL", "Dados de clientes/credenciais — só o Keycloak acessa")
@@ -57,10 +59,13 @@ C4Container
 
     System_Ext(pagamento, "Gateway de pagamento (mock)")
 
-    Rel(cliente, identityApi, "POST /clientes (cadastro)", "HTTPS")
-    Rel(cliente, keycloak, "Login — troca credenciais por JWT", "HTTPS")
-    Rel(cliente, vendasApi, "Lista veículos, compra", "HTTPS + Bearer JWT")
-    Rel(vendedor, vendasApi, "Cadastra/edita veículos", "HTTPS + Bearer JWT")
+    Rel(cliente, gateway, "POST /identity/clientes (cadastro)", "HTTPS")
+    Rel(cliente, keycloak, "Login — troca credenciais por JWT (fora do gateway, ver US1.2)", "HTTPS")
+    Rel(cliente, gateway, "Lista veículos, compra (/vendas/**)", "HTTPS + Bearer JWT")
+    Rel(vendedor, gateway, "Cadastra/edita veículos (/vendas/**)", "HTTPS + Bearer JWT")
+
+    Rel(gateway, identityApi, "proxy /identity/** → /**", "HTTP (rede interna)")
+    Rel(gateway, vendasApi, "proxy /vendas/** → /**", "HTTP (rede interna)")
 
     Rel(identityApi, keycloak, "Admin REST API (client de serviço)", "HTTPS")
     Rel(keycloak, keycloakDb, "JDBC")
@@ -70,6 +75,12 @@ C4Container
 ```
 
 **Notas sobre o diagrama:**
+- `gateway` (YARP) é a **porta única de entrada** para `identity-api` e `vendas-api` — o
+  cliente nunca fala direto com eles (mesmo padrão do gateway usado no hackathon de
+  arquitetura de software desta pós-graduação). O **login continua fora do gateway**: o
+  cliente troca credenciais por token direto no Keycloak (ver US1.2 em
+  `fase3/docs/refinamentos/US1.2-login.md`, fora deste repositório, e
+  [ADR-0005](adr/0005-api-gateway-yarp.md)).
 - `vendas-api` valida o JWT localmente via **JWKS** do Keycloak (chave pública) — nunca chama
   o `identity-api` nem acessa `keycloakDb` para isso. É o que garante o isolamento do serviço
   de identidade exigido pelo enunciado mesmo em tempo de execução, não só no deploy
@@ -92,34 +103,45 @@ cliente, cadastro de veículo, compra e efetivação da compra.
 sequenceDiagram
     participant C as Cliente
     participant V as Vendedor
+    participant GW as gateway
     participant IA as identity-api
     participant KC as Keycloak
     participant VA as vendas-api
     participant PG as Gateway de pagamento (mock)
 
-    C->>IA: POST /clientes (cadastro)
+    C->>GW: POST /identity/clientes (cadastro)
+    GW->>IA: proxy → POST /clientes
     IA->>KC: Admin API — cria usuário no realm `clientes`
-    IA-->>C: 201 Created
+    IA-->>GW: 201 Created
+    GW-->>C: 201 Created
 
-    C->>KC: login (troca credenciais por token)
+    C->>KC: login (troca credenciais por token — direto, fora do gateway)
     KC-->>C: JWT
 
-    V->>VA: POST /veiculos (Bearer JWT do vendedor)
-    VA-->>V: 201 Created (status = disponível)
+    V->>GW: POST /vendas/veiculos (Bearer JWT do vendedor)
+    GW->>VA: proxy → POST /veiculos
+    VA-->>GW: 201 Created (status = disponível)
+    GW-->>V: 201 Created
 
-    C->>VA: GET /veiculos (à venda, ordenado por preço)
-    VA-->>C: lista de veículos disponíveis
+    C->>GW: GET /vendas/veiculos (à venda, ordenado por preço)
+    GW->>VA: proxy → GET /veiculos
+    VA-->>GW: lista de veículos disponíveis
+    GW-->>C: lista de veículos disponíveis
 
-    C->>VA: POST /compras {veiculoId} (Bearer JWT)
+    C->>GW: POST /vendas/compras {veiculoId} (Bearer JWT)
+    GW->>VA: proxy → POST /compras
     VA->>KC: valida o token via JWKS
     VA->>VA: veículo → reservado · compra → pendente
-    VA-->>C: 201 Created
+    VA-->>GW: 201 Created
+    GW-->>C: 201 Created
 
     PG-->>VA: webhook — pagamento confirmado
     VA->>VA: compra → concluído · veículo → vendido
 
-    C->>VA: GET /compras/{id}
-    VA-->>C: status = concluído
+    C->>GW: GET /vendas/compras/{id}
+    GW->>VA: proxy → GET /compras/{id}
+    VA-->>GW: status = concluído
+    GW-->>C: status = concluído
 ```
 
 ---
@@ -147,3 +169,4 @@ Formato [MADR](https://adr.github.io/madr/) em [`docs/adr/`](adr/):
 - [ADR-0002 — Dois serviços (identity-api + vendas-api), não três](adr/0002-dois-servicos-identity-vendas.md)
 - [ADR-0003 — .NET 10 como stack](adr/0003-dotnet-10.md)
 - [ADR-0004 — Scalar em vez de Swagger/Swashbuckle](adr/0004-scalar-em-vez-de-swagger.md)
+- [ADR-0005 — API Gateway (YARP) como porta única de entrada](adr/0005-api-gateway-yarp.md)
