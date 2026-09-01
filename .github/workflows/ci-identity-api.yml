@@ -38,6 +38,14 @@ jobs:
         if: steps.filter.outputs.relevant == 'true'
         run: dotnet restore src/IdentityApi/IdentityApi.csproj
 
+      - name: Lint (dotnet format)
+        if: steps.filter.outputs.relevant == 'true'
+        run: |
+          dotnet format src/IdentityApi/IdentityApi.csproj --verify-no-changes
+          dotnet format src/IdentityApi.Domain/IdentityApi.Domain.csproj --verify-no-changes
+          dotnet format src/IdentityApi.Application/IdentityApi.Application.csproj --verify-no-changes
+          dotnet format src/IdentityApi.Infrastructure/IdentityApi.Infrastructure.csproj --verify-no-changes
+
       - name: Build
         if: steps.filter.outputs.relevant == 'true'
         run: dotnet build src/IdentityApi/IdentityApi.csproj --no-restore -c Release
