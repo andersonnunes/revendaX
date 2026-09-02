@@ -20,8 +20,9 @@ planejamento da atividade acadêmica, não parte da entrega.
 
 > **Status atual**: Épico 1 (Identidade) completo — cadastro (US1.1), login direto no Keycloak
 > (US1.2), validação de token no `vendas-api` via JWKS (US1.3, endpoint `/whoami` de
-> diagnóstico) e recuperação de senha (US1.4). `gateway` ainda é só o esqueleto (build,
-> testes, Docker, roteamento); Épicos 2/3 (veículos, compras) ainda não implementados.
+> diagnóstico), recuperação de senha (US1.4) e usuário `vendedor` provisionado no realm
+> (US1.5). `gateway` ainda é só o esqueleto (build, testes, Docker, roteamento); Épicos 2/3
+> (veículos, compras) ainda não implementados.
 
 ## Como rodar localmente
 
@@ -128,6 +129,27 @@ curl -o /dev/null -w "%{http_code}\n" http://localhost:8080/vendas/whoami
 > externa), enquanto `vendas-api` valida via hostname interno do Docker (`keycloak:8080`) —
 > os dois nunca bateriam e todo token seria rejeitado como "issuer inválido".
 
+## Testar a role `vendedor` (US1.5)
+
+Não existe autocadastro de vendedor — o realm já sobe com um usuário semeado, **credencial de
+desenvolvimento/demonstração local, não uma credencial real**:
+
+```
+usuário: vendedor@revendax.local
+senha:   VendedorDev123
+```
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8081/realms/clientes/protocol/openid-connect/token \
+  -d "grant_type=password" -d "client_id=vendas-frontend" \
+  -d "username=vendedor@revendax.local" -d "password=VendedorDev123" | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+
+curl http://localhost:8080/vendas/whoami/vendedor -H "Authorization: Bearer $TOKEN"
+# 200 — { "sub": "...", "email": "vendedor@revendax.local", "roles": ["cliente", "vendedor", ...] }
+```
+
+Um token de comprador (US1.1/US1.2) nesse mesmo endpoint → 403 (role `vendedor` ausente).
+
 ## Testar a recuperação de senha (US1.4)
 
 `identity-api` só dispara o e-mail — a troca de senha acontece na página hospedada do
@@ -161,8 +183,9 @@ login (direto no Keycloak, ROPC via `vendas-frontend`) e recuperação de senha 
 **Mailpit reais**, na mesma rede Docker do teste — confirma que o e-mail chega no destinatário
 certo via API do Mailpit) de ponta a ponta). `vendas-api.Tests`
 segue o mesmo padrão (Keycloak real via Testcontainers) e cobre a validação de token
-(`/whoami`, `/whoami/cliente`) — token válido, sem token, assinatura adulterada, e com/sem a
-role `cliente`. `gateway` ainda só cobre o esqueleto (`GET /health`).
+(`/whoami`, `/whoami/cliente`, `/whoami/vendedor`) — token válido, sem token, assinatura
+adulterada, com/sem a role `cliente`, e o usuário `vendedor` semeado (US1.5) vs. um comprador
+comum. `gateway` ainda só cobre o esqueleto (`GET /health`).
 
 ## Estrutura
 
