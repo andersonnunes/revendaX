@@ -18,7 +18,13 @@ public static class DependencyInjection
             client.BaseAddress = new Uri(keycloakOptions.BaseUrl);
         });
 
-        services.AddHttpClient<IIdentityProvider, KeycloakIdentityProvider>((serviceProvider, client) =>
+        services.AddHttpClient<ICriarClienteProvider, KeycloakClienteProvider>((serviceProvider, client) =>
+        {
+            var keycloakOptions = serviceProvider.GetRequiredService<IOptions<KeycloakOptions>>().Value;
+            client.BaseAddress = new Uri(keycloakOptions.BaseUrl);
+        });
+
+        services.AddHttpClient<IRecuperarSenhaProvider, KeycloakRecuperarSenhaProvider>((serviceProvider, client) =>
         {
             var keycloakOptions = serviceProvider.GetRequiredService<IOptions<KeycloakOptions>>().Value;
             client.BaseAddress = new Uri(keycloakOptions.BaseUrl);
