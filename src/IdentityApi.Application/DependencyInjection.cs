@@ -8,6 +8,7 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddScoped<ICriarClienteUseCase, CriarClienteUseCase>();
+        services.AddScoped<IRecuperarSenhaUseCase, RecuperarSenhaUseCase>();
         return services;
     }
 }

@@ -16,4 +16,12 @@ public interface IIdentityProvider
     /// conforme o caso.
     /// </summary>
     Task<ClienteResult> CriarClienteAsync(CriarClienteCommand command, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Dispara o e-mail de redefinição de senha (US1.4) — não faz nada, silenciosamente, se o
+    /// e-mail não existir (uniformidade da resposta é responsabilidade de quem chama, não
+    /// desta porta). Lança <see cref="IdentityApi.Domain.Exceptions.ProvedorIdentidadeIndisponivelException"/>
+    /// se o provedor estiver indisponível.
+    /// </summary>
+    Task RecuperarSenhaAsync(string email, CancellationToken cancellationToken);
 }
