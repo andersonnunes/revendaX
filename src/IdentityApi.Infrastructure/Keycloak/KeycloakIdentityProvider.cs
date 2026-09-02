@@ -53,6 +53,61 @@ public class KeycloakIdentityProvider(
         }
     }
 
+    public async Task RecuperarSenhaAsync(string email, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var accessToken = await tokenProvider.GetServiceAccountTokenAsync(cancellationToken);
+            var userId = await BuscarIdPorEmailAsync(accessToken, email, cancellationToken);
+            if (userId is null)
+            {
+                return; // e-mail não cadastrado — silencioso de propósito, resposta uniforme é do controller
+            }
+
+            await DispararEmailDeRedefinicaoAsync(accessToken, userId, cancellationToken);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            throw new ProvedorIdentidadeIndisponivelException(
+                "Não foi possível falar com o provedor de identidade.", ex);
+        }
+    }
+
+    private async Task<string?> BuscarIdPorEmailAsync(string accessToken, string email, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"admin/realms/{_options.Realm}/users?email={Uri.EscapeDataString(email)}&exact=true");
+        request.Headers.Authorization = new("Bearer", accessToken);
+
+        var response = await httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new ProvedorIdentidadeIndisponivelException(
+                $"Falha ao consultar e-mail no Keycloak (HTTP {(int)response.StatusCode}).");
+        }
+
+        var usuarios = await response.Content.ReadFromJsonAsync<List<KeycloakUserRead>>(cancellationToken);
+        return usuarios is { Count: > 0 } ? usuarios[0].Id : null;
+    }
+
+    private async Task DispararEmailDeRedefinicaoAsync(string accessToken, string userId, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Put, $"admin/realms/{_options.Realm}/users/{userId}/execute-actions-email")
+        {
+            Content = JsonContent.Create(new[] { "UPDATE_PASSWORD" }),
+        };
+        request.Headers.Authorization = new("Bearer", accessToken);
+
+        var response = await httpClient.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new ProvedorIdentidadeIndisponivelException(
+                $"Falha ao disparar e-mail de redefinição no Keycloak (HTTP {(int)response.StatusCode}).");
+        }
+    }
+
     private async Task GarantirCpfDisponivelAsync(string accessToken, string cpfDigits, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(
@@ -157,5 +212,11 @@ public class KeycloakIdentityProvider(
 
         [JsonPropertyName("temporary")]
         public bool Temporary { get; set; }
+    }
+
+    private class KeycloakUserRead
+    {
+        [JsonPropertyName("id")]
+        public required string Id { get; set; }
     }
 }
