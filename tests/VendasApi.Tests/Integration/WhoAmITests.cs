@@ -101,6 +101,29 @@ public class WhoAmITests : IClassFixture<KeycloakContainerFixture>, IAsyncLifeti
         }
     }
 
+    [Fact]
+    public async Task WhoAmIVendedor_UsuarioVendedorSemeado_Retorna200()
+    {
+        // Usuário semeado no export do realm (US1.5), não criado por este teste.
+        var token = await _keycloakHelper.LoginAsync("vendedor@revendax.local", "VendedorDev123");
+        _client.DefaultRequestHeaders.Authorization = new("Bearer", token);
+
+        var response = await _client.GetAsync("/whoami/vendedor");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task WhoAmIVendedor_TokenDeComprador_Retorna403()
+    {
+        var token = await CriarClienteEFazerLoginAsync();
+        _client.DefaultRequestHeaders.Authorization = new("Bearer", token);
+
+        var response = await _client.GetAsync("/whoami/vendedor");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     private async Task<string> CriarClienteEFazerLoginAsync()
     {
         var email = $"vendas-teste.{Guid.NewGuid():N}@example.com";
