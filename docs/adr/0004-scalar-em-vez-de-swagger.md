@@ -33,7 +33,6 @@ Swashbuckle/SwaggerUI.
 **Negativas / trade-offs aceitos:**
 - Menos onipresente que Swagger — quem já conhece SwaggerUI de outros projetos precisa se
   adaptar à UI do Scalar (baixo custo, mas existe).
-- Um primeiro esqueleto (US0, descartado — ver [ADR-0003](0003-dotnet-10.md)) foi gerado pelo
+- Um primeiro esqueleto (descartado — ver [ADR-0003](0003-dotnet-10.md)) foi gerado pelo
   template padrão, que vem com `Swashbuckle.AspNetCore` por default — ao recriar o esqueleto
-  direto em `net10.0`, já nasce com Scalar, sem essa migração intermediária. Detalhes em
-  `fase3/docs/refinamentos/US0-esqueleto-apis.md`, fora deste repositório.
+  direto em `net10.0`, já nasceu com Scalar, sem migração intermediária.

@@ -4,12 +4,10 @@ Plataforma para uma revendedora de veículos automotores vender online, constru�
 Trabalho Substitutivo de Tech Challenge (Fase 3, curso SOAT — PósTech/FIAP). Este documento
 descreve a arquitetura **planejada**, antes da implementação em si.
 
-> `BACKLOG.md` e `docs/refinamentos/` (histórias, critérios de aceite, o que já foi
-> executado em código) ficam **fora deste repositório** — são material de planejamento da
-> atividade acadêmica, não parte da entrega. Vivem no diretório da atividade
-> (`fase3/BACKLOG.md` e `fase3/docs/refinamentos/`), um nível acima deste repositório —
-> por isso não há link direto aqui: uma vez que este repositório for publicado sozinho
-> (ex.: no GitHub), esses arquivos não o acompanham.
+> O backlog e o detalhamento de cada história (critérios de aceite, cenários de teste) são
+> material de planejamento da atividade acadêmica e **não fazem parte deste repositório** —
+> quem avalia este repositório não tem acesso a eles. Este documento e os ADRs em `docs/adr/`
+> são a fonte de verdade autocontida sobre a arquitetura.
 
 ## Índice
 
@@ -78,14 +76,12 @@ C4Container
 - `gateway` (YARP) é a **porta única de entrada** para `identity-api` e `vendas-api` — o
   cliente nunca fala direto com eles (mesmo padrão do gateway usado no hackathon de
   arquitetura de software desta pós-graduação). O **login continua fora do gateway**: o
-  cliente troca credenciais por token direto no Keycloak (ver US1.2 em
-  `fase3/docs/refinamentos/US1.2-login.md`, fora deste repositório, e
-  [ADR-0005](adr/0005-api-gateway-yarp.md)).
+  cliente troca credenciais por token direto no Keycloak, via ROPC (Resource Owner Password
+  Credentials) num client público — ver [ADR-0005](adr/0005-api-gateway-yarp.md).
 - `vendas-api` valida o JWT localmente via **JWKS** do Keycloak (chave pública) — nunca chama
   o `identity-api` nem acessa `keycloakDb` para isso. É o que garante o isolamento do serviço
-  de identidade exigido pelo enunciado mesmo em tempo de execução, não só no deploy
-  (ver [ADR-0002](adr/0002-dois-servicos-identity-vendas.md) e US1.3 em
-  `fase3/docs/refinamentos/US1.1-cadastro-cliente.md`, fora deste repositório).
+  de identidade exigido pelo enunciado mesmo em tempo de execução, não só no deploy (ver
+  [ADR-0002](adr/0002-dois-servicos-identity-vendas.md)).
 - `identity-api` é a **única** peça com credencial (client de serviço confidencial) para
   escrever no Keycloak via Admin REST API — o frontend nunca fala direto com a Admin API.
 - Veículos e compras (Épicos 2 e 3) ficam no mesmo serviço/banco por decisão explícita — o

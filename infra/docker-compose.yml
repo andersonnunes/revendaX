@@ -5,10 +5,15 @@
 # /vendas/** para vendas-api (YARP, ver src/Gateway/appsettings.json). identity-api e
 # vendas-api também têm porta própria exposta, só para debug direto sem passar pelo gateway.
 #
-# Escopo desta US0: só o esqueleto sobe (os 3 serviços .NET, Keycloak "puro" sem o realm
-# `clientes` importado ainda, e os bancos de cada serviço). Configurar o realm do Keycloak é
-# responsabilidade da US1.1 (ver fase3/docs/refinamentos/US1.1-cadastro-cliente.md, fora
-# deste repositório).
+# O Keycloak sobe com o realm `clientes` importado automaticamente
+# (infra/keycloak/realm-clientes.json) — client `identity-api` (confidencial, service account
+# com manage-users), client público `vendas-frontend` (login via ROPC), role `cliente`
+# (default role) e os user attributes customizados (cpf, telefone) já configurados.
+#
+# IMPORTANTE: o Keycloak só reimporta esse arquivo se o realm ainda não existir no Postgres
+# dele (keycloak-db-data). Depois de editar o realm, use `docker compose down -v` antes do
+# próximo `up` — senão a mudança é ignorada silenciosamente (o volume persiste a versão
+# antiga).
 name: revendax
 
 services:
@@ -30,6 +35,13 @@ services:
       dockerfile: src/IdentityApi/Dockerfile
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - Keycloak__BaseUrl=http://keycloak:8080
+      - Keycloak__Realm=clientes
+      - Keycloak__ClientId=identity-api
+      # Secret de desenvolvimento fixo, definido no próprio realm-clientes.json commitado —
+      # mesmo padrão já aceito para o admin do Keycloak (admin/admin) e o usuário vendedor
+      # (US1.5): ambiente local efêmero, não é segredo de produção.
+      - Keycloak__ClientSecret=dev-identity-api-secret
     ports:
       - "5081:8080" # exposta à parte para debug direto; o acesso "oficial" é via gateway
     depends_on:
@@ -41,15 +53,18 @@ services:
       dockerfile: src/VendasApi/Dockerfile
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      - Keycloak__BaseUrl=http://keycloak:8080
     ports:
       - "5082:8080" # exposta à parte para debug direto; o acesso "oficial" é via gateway
     depends_on:
+      keycloak:
+        condition: service_started
       vendas-db:
         condition: service_healthy
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
-    command: start-dev
+    command: start-dev --import-realm
     environment:
       - KC_BOOTSTRAP_ADMIN_USERNAME=admin
       - KC_BOOTSTRAP_ADMIN_PASSWORD=admin
@@ -57,11 +72,29 @@ services:
       - KC_DB_URL=jdbc:postgresql://keycloak-db:5432/keycloak
       - KC_DB_USERNAME=keycloak
       - KC_DB_PASSWORD=keycloak
+      # Fixa o hostname usado no claim `iss` dos tokens (US1.3) — sem isso, o Keycloak calcula
+      # o issuer a partir do host:porta que cada chamador usou pra logar (ex.: localhost:8081
+      # do host), mas o vendas-api valida via hostname interno do Docker (keycloak:8080); os
+      # dois nunca bateriam, e todo token seria rejeitado com "issuer inválido".
+      - KC_HOSTNAME=http://keycloak:8080
+      - KC_HOSTNAME_STRICT=true
+    volumes:
+      - ./keycloak/realm-clientes.json:/opt/keycloak/data/import/realm-clientes.json:ro
     ports:
       - "8081:8080"
     depends_on:
       keycloak-db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  # SMTP fake para dev/demonstração (US1.4) — o realm `clientes` está configurado para
+  # enviar e-mail de redefinição de senha via este serviço (host "mailpit", porta 1025), não
+  # um provedor real. UI + API de inspeção: http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
 
   keycloak-db:
     image: postgres:16-alpine

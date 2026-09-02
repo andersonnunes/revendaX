@@ -43,8 +43,8 @@ Keycloak, que é peça de infraestrutura de terceiros.
 
 **Negativas / trade-offs aceitos:**
 - Mais um serviço para buildar, testar, conteinerizar e escanear (Trivy) — aceito porque o
-  padrão de CI por serviço (ADR implícito em `docs/refinamentos/US0-esqueleto-apis.md`, fora
-  deste repositório) já é replicável sem esforço extra: só mais um `ci-<servico>.yml`.
+  padrão de CI por serviço já estabelecido nos outros dois serviços é replicável sem esforço
+  extra: só mais um `ci-<servico>.yml`.
 - Mais um salto de rede por requisição (cliente → gateway → serviço) — irrelevante no escopo
   do desafio (sem requisito de latência), mas registrado como trade-off real.
 - O gateway **não** faz validação de token nem qualquer regra de negócio — é roteamento puro.

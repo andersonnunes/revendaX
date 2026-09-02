@@ -11,4 +11,9 @@
     <PackageReference Include="Scalar.AspNetCore" Version="2.17.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\IdentityApi.Application\IdentityApi.Application.csproj" />
+    <ProjectReference Include="..\IdentityApi.Infrastructure\IdentityApi.Infrastructure.csproj" />
+  </ItemGroup>
+
 </Project>

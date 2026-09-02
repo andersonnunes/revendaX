@@ -7,10 +7,18 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0.101 AS build
 WORKDIR /src
 
+# IdentityApi.csproj referencia IdentityApi.Domain/.Application/.Infrastructure — os 4
+# projetos precisam estar no contexto para o restore seguir as ProjectReference corretamente.
 COPY ["src/IdentityApi/IdentityApi.csproj", "src/IdentityApi/"]
+COPY ["src/IdentityApi.Domain/IdentityApi.Domain.csproj", "src/IdentityApi.Domain/"]
+COPY ["src/IdentityApi.Application/IdentityApi.Application.csproj", "src/IdentityApi.Application/"]
+COPY ["src/IdentityApi.Infrastructure/IdentityApi.Infrastructure.csproj", "src/IdentityApi.Infrastructure/"]
 RUN dotnet restore "src/IdentityApi/IdentityApi.csproj"
 
 COPY src/IdentityApi/. src/IdentityApi/
+COPY src/IdentityApi.Domain/. src/IdentityApi.Domain/
+COPY src/IdentityApi.Application/. src/IdentityApi.Application/
+COPY src/IdentityApi.Infrastructure/. src/IdentityApi.Infrastructure/
 WORKDIR /src/src/IdentityApi
 RUN dotnet publish -c Release -o /app/publish --no-restore
 
