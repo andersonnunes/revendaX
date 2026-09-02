@@ -8,20 +8,21 @@ namespace IdentityApi.Tests.Integration;
 /// Cenários de teste do cadastro de cliente (`POST /clientes`) contra um Keycloak real
 /// efêmero — não mockado.
 /// </summary>
-public class ClientesControllerTests : IClassFixture<KeycloakContainerFixture>, IAsyncLifetime
+[Collection(nameof(IdentityApiIntegrationCollection))]
+public class ClientesControllerTests : IAsyncLifetime
 {
-    private readonly KeycloakContainerFixture _keycloak;
+    private readonly MailKeycloakFixture _keycloak;
     private IdentityApiFactory _factory = null!;
     private HttpClient _client = null!;
 
-    public ClientesControllerTests(KeycloakContainerFixture keycloak)
+    public ClientesControllerTests(MailKeycloakFixture keycloak)
     {
         _keycloak = keycloak;
     }
 
     public Task InitializeAsync()
     {
-        _factory = new IdentityApiFactory(_keycloak.BaseUrl);
+        _factory = new IdentityApiFactory(_keycloak.KeycloakBaseUrl);
         _client = _factory.CreateClient();
         return Task.CompletedTask;
     }

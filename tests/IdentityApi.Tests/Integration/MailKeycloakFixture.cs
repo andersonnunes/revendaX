@@ -9,6 +9,11 @@ namespace IdentityApi.Tests.Integration;
 /// Keycloak + Mailpit na mesma rede Docker, com o Mailpit respondendo pelo alias `mailpit` —
 /// o mesmo hostname configurado em `smtpServer.host` no `realm-clientes.json` (US1.4), então
 /// não precisa de configuração de teste separada da de produção/dev.
+///
+/// Única instância por execução da suíte, compartilhada por todas as classes de teste de
+/// integração do `identity-api` via <see cref="IdentityApiIntegrationCollection"/> (o Mailpit
+/// não atrapalha quem só precisa do Keycloak — testes que não mandam e-mail simplesmente
+/// não consultam a API do Mailpit).
 /// </summary>
 public class MailKeycloakFixture : IAsyncLifetime
 {

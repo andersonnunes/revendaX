@@ -7,7 +7,8 @@ namespace IdentityApi.Tests.Integration;
 /// Cenários de teste da US1.4 contra Keycloak + Mailpit reais e efêmeros — o e-mail de
 /// redefinição precisa mesmo sair do Keycloak e chegar no Mailpit, não é assumido.
 /// </summary>
-public class RecuperarSenhaTests : IClassFixture<MailKeycloakFixture>, IAsyncLifetime
+[Collection(nameof(IdentityApiIntegrationCollection))]
+public class RecuperarSenhaTests : IAsyncLifetime
 {
     private readonly MailKeycloakFixture _fixture;
     private IdentityApiFactory _factory = null!;

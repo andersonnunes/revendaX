@@ -12,23 +12,24 @@ namespace IdentityApi.Tests.Integration;
 /// isso este teste registra o cliente via `identity-api` mas loga chamando o Keycloak
 /// efêmero diretamente, provando o fluxo cadastro→login de ponta a ponta.
 /// </summary>
-public class LoginTests : IClassFixture<KeycloakContainerFixture>, IAsyncLifetime
+[Collection(nameof(IdentityApiIntegrationCollection))]
+public class LoginTests : IAsyncLifetime
 {
-    private readonly KeycloakContainerFixture _keycloak;
+    private readonly MailKeycloakFixture _keycloak;
     private IdentityApiFactory _factory = null!;
     private HttpClient _identityClient = null!;
     private HttpClient _keycloakClient = null!;
 
-    public LoginTests(KeycloakContainerFixture keycloak)
+    public LoginTests(MailKeycloakFixture keycloak)
     {
         _keycloak = keycloak;
     }
 
     public Task InitializeAsync()
     {
-        _factory = new IdentityApiFactory(_keycloak.BaseUrl);
+        _factory = new IdentityApiFactory(_keycloak.KeycloakBaseUrl);
         _identityClient = _factory.CreateClient();
-        _keycloakClient = new HttpClient { BaseAddress = new Uri(_keycloak.BaseUrl) };
+        _keycloakClient = new HttpClient { BaseAddress = new Uri(_keycloak.KeycloakBaseUrl) };
         return Task.CompletedTask;
     }
 
