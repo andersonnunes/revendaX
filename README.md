@@ -220,3 +220,8 @@ revendaX/
 Cada serviço tem CI independente (`.github/workflows/ci-<servico>.yml`), disparado só por
 mudanças no seu próprio path — uma mudança em `vendas-api` não builda nem testa
 `identity-api` nem `gateway`, e por aí vai.
+
+Cada CI também **falha se a cobertura de linha ficar abaixo de 80%** (`coverlet.msbuild`,
+`/p:Threshold=80`) — código gerado (ex.: glue do Scalar/OpenAPI, sempre em `obj/`) é excluído
+do cálculo (`/p:ExcludeByFile="**/obj/**/*.cs"`), senão o número ficaria artificialmente baixo
+sem refletir lógica de fato não testada.
