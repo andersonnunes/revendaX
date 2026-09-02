@@ -50,13 +50,24 @@ jobs:
         if: steps.filter.outputs.relevant == 'true'
         run: dotnet build src/IdentityApi/IdentityApi.csproj --no-restore -c Release
 
+      # Threshold de cobertura (80%, linhas) via coverlet.msbuild — falha o `dotnet test` (exit
+      # code != 0) se ficar abaixo. `ExcludeByFile` tira código gerado (ex.: glue do Scalar/
+      # OpenAPI em obj/), que senão distorce o número pra baixo sem refletir lógica não testada.
       - name: Test (Domain — unitário)
         if: steps.filter.outputs.relevant == 'true'
-        run: dotnet test tests/IdentityApi.Domain.Tests/IdentityApi.Domain.Tests.csproj -c Release
+        run: >
+          dotnet test tests/IdentityApi.Domain.Tests/IdentityApi.Domain.Tests.csproj -c Release
+          /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
+          /p:ExcludeByFile="**/obj/**/*.cs"
+          /p:Threshold=80 /p:ThresholdType=line /p:ThresholdStat=total
 
       - name: Test (integração — Keycloak real via Testcontainers)
         if: steps.filter.outputs.relevant == 'true'
-        run: dotnet test tests/IdentityApi.Tests/IdentityApi.Tests.csproj -c Release
+        run: >
+          dotnet test tests/IdentityApi.Tests/IdentityApi.Tests.csproj -c Release
+          /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
+          /p:ExcludeByFile="**/obj/**/*.cs"
+          /p:Threshold=80 /p:ThresholdType=line /p:ThresholdStat=total
 
       - name: Build Docker image
         if: steps.filter.outputs.relevant == 'true'
