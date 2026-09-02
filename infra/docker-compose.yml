@@ -85,6 +85,16 @@ services:
     depends_on:
       keycloak-db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  # SMTP fake para dev/demonstração (US1.4) — o realm `clientes` está configurado para
+  # enviar e-mail de redefinição de senha via este serviço (host "mailpit", porta 1025), não
+  # um provedor real. UI + API de inspeção: http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
 
   keycloak-db:
     image: postgres:16-alpine
