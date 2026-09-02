@@ -7,8 +7,8 @@ namespace IdentityApi.Application.Clientes;
 /// exista ou não o e-mail) é decisão do controller, não deste caso de uso: aqui não há nada
 /// pra "ramificar", só repassar.
 /// </summary>
-public class RecuperarSenhaUseCase(IIdentityProvider identityProvider) : IRecuperarSenhaUseCase
+public class RecuperarSenhaUseCase(IRecuperarSenhaProvider recuperarSenhaProvider) : IRecuperarSenhaUseCase
 {
     public Task ExecutarAsync(RecuperarSenhaCommand command, CancellationToken cancellationToken) =>
-        identityProvider.RecuperarSenhaAsync(command.Email, cancellationToken);
+        recuperarSenhaProvider.RecuperarSenhaAsync(command.Email, cancellationToken);
 }

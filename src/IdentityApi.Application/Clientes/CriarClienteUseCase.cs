@@ -10,7 +10,7 @@ namespace IdentityApi.Application.Clientes;
 /// é responsabilidade da implementação de <see cref="IIdentityProvider"/>, não deste caso de
 /// uso.
 /// </summary>
-public class CriarClienteUseCase(IIdentityProvider identityProvider) : ICriarClienteUseCase
+public class CriarClienteUseCase(ICriarClienteProvider clienteProvider) : ICriarClienteUseCase
 {
     public Task<ClienteResult> ExecutarAsync(CriarClienteCommand command, CancellationToken cancellationToken)
     {
@@ -19,6 +19,6 @@ public class CriarClienteUseCase(IIdentityProvider identityProvider) : ICriarCli
             throw new CpfInvalidoException();
         }
 
-        return identityProvider.CriarClienteAsync(command, cancellationToken);
+        return clienteProvider.CriarClienteAsync(command, cancellationToken);
     }
 }
