@@ -102,6 +102,28 @@ public class LoginTests : IClassFixture<KeycloakContainerFixture>, IAsyncLifetim
         Assert.False(string.IsNullOrWhiteSpace(novoToken!.AccessToken));
     }
 
+    [Fact]
+    public async Task Login_UsuarioVendedorSemeado_TokenContemRoleVendedor()
+    {
+        // Usuário semeado no export do realm (US1.5), não criado via identity-api.
+        var response = await LoginAsync("vendedor@revendax.local", "VendedorDev123");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var claims = await DecodificarTokenAsync(response);
+        Assert.Contains("vendedor", claims.Roles);
+    }
+
+    [Fact]
+    public async Task Login_ClienteRecemCadastrado_TokenNuncaContemRoleVendedor()
+    {
+        var (email, senha, _) = await RegistrarClienteAsync();
+
+        var response = await LoginAsync(email, senha);
+
+        var claims = await DecodificarTokenAsync(response);
+        Assert.DoesNotContain("vendedor", claims.Roles);
+    }
+
     private async Task<(string Email, string Senha, string Id)> RegistrarClienteAsync()
     {
         var request = TestData.NovoClienteValido();
