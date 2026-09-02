@@ -48,6 +48,15 @@
   "roles": {
     "realm": [
       {
+        "id": "dbe7e922-a2d7-4a7f-b9a3-200f1941d045",
+        "name": "vendedor",
+        "description": "Vendedor/administrador da revendedora — cadastra e edita veículos (Épico 2). Não é default role.",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "0c8c6d10-0bfa-4422-8cba-0782360ba493",
+        "attributes": {}
+      },
+      {
         "id": "3682a3fd-0805-47ac-8927-075277514ca3",
         "name": "cliente",
         "description": "Comprador cadastrado via identity-api (US1.1)",
@@ -490,6 +499,24 @@
       },
       "notBefore": 0,
       "groups": []
+    },
+    {
+      "username": "vendedor@revendax.local",
+      "email": "vendedor@revendax.local",
+      "firstName": "Vendedor RevendaX",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "VendedorDev123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "vendedor",
+        "default-roles-clientes"
+      ]
     }
   ],
   "scopeMappings": [
@@ -1664,14 +1691,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
-            "oidc-sha256-pairwise-sub-mapper",
             "saml-user-property-mapper",
-            "oidc-usermodel-property-mapper",
-            "oidc-full-name-mapper",
-            "oidc-address-mapper",
             "saml-role-list-mapper",
+            "oidc-address-mapper",
+            "oidc-usermodel-property-mapper",
+            "oidc-usermodel-attribute-mapper",
             "saml-user-attribute-mapper",
-            "oidc-usermodel-attribute-mapper"
+            "oidc-sha256-pairwise-sub-mapper",
+            "oidc-full-name-mapper"
           ]
         }
       },
@@ -1728,12 +1755,12 @@
           "allowed-protocol-mapper-types": [
             "oidc-usermodel-attribute-mapper",
             "oidc-address-mapper",
-            "saml-user-attribute-mapper",
-            "saml-user-property-mapper",
+            "oidc-sha256-pairwise-sub-mapper",
             "oidc-usermodel-property-mapper",
+            "saml-user-property-mapper",
+            "saml-user-attribute-mapper",
             "saml-role-list-mapper",
-            "oidc-full-name-mapper",
-            "oidc-sha256-pairwise-sub-mapper"
+            "oidc-full-name-mapper"
           ]
         }
       }
