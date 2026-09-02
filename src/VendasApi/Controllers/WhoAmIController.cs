@@ -29,4 +29,9 @@ public class WhoAmIController : ControllerBase
     [HttpGet("cliente")]
     [Authorize(Roles = "cliente")]
     public IActionResult GetSoParaCliente() => Get();
+
+    /// <summary>Variante para a role `vendedor` (US1.5) — 403 se o token não tiver essa role.</summary>
+    [HttpGet("vendedor")]
+    [Authorize(Roles = "vendedor")]
+    public IActionResult GetSoParaVendedor() => Get();
 }
