@@ -16,10 +16,12 @@ planejamento da atividade acadêmica, não parte da entrega.
 | `identity-api` | Cadastro de clientes — única credencial com permissão de escrita no Keycloak | `5081` (debug direto) |
 | `vendas-api` | Catálogo de veículos e compras | `5082` (debug direto) |
 | Keycloak | Identity Provider (realm `clientes`, ainda não configurado — ver status abaixo) | `8081` |
+| Mailpit | SMTP fake de dev (US1.4) — captura os e-mails de redefinição de senha | `8025` (UI/API) |
 
-> **Status atual**: `identity-api` implementa o cadastro (US1.1); login (US1.2) é direto no
-> Keycloak; `vendas-api` já valida token via JWKS (US1.3, endpoint `/whoami` de diagnóstico).
-> `gateway` ainda é só o esqueleto (build, testes, Docker, roteamento).
+> **Status atual**: Épico 1 (Identidade) completo — cadastro (US1.1), login direto no Keycloak
+> (US1.2), validação de token no `vendas-api` via JWKS (US1.3, endpoint `/whoami` de
+> diagnóstico) e recuperação de senha (US1.4). `gateway` ainda é só o esqueleto (build,
+> testes, Docker, roteamento); Épicos 2/3 (veículos, compras) ainda não implementados.
 
 ## Como rodar localmente
 
@@ -126,6 +128,25 @@ curl -o /dev/null -w "%{http_code}\n" http://localhost:8080/vendas/whoami
 > externa), enquanto `vendas-api` valida via hostname interno do Docker (`keycloak:8080`) —
 > os dois nunca bateriam e todo token seria rejeitado como "issuer inválido".
 
+## Testar a recuperação de senha (US1.4)
+
+`identity-api` só dispara o e-mail — a troca de senha acontece na página hospedada do
+Keycloak. E-mails de desenvolvimento são capturados pelo **Mailpit**, UI em
+`http://localhost:8025`:
+
+```bash
+curl -X POST http://localhost:8080/identity/clientes/recuperar-senha \
+  -H "Content-Type: application/json" -d '{"email": "maria@example.com"}'
+# 202 — sempre, exista ou não o e-mail (evita enumeração de contas)
+```
+
+Abra `http://localhost:8025` para ver o e-mail capturado. O link de redefinição vem apontando
+para o hostname **interno** do Docker (`http://keycloak:8080/realms/clientes/login-actions/...`,
+necessário para o `iss` dos tokens ficar consistente — ver seção anterior) — para
+efetivamente abrir no navegador do host (ex.: gravando o vídeo de demonstração), troque
+`keycloak:8080` por `localhost:8081` na URL copiada do Mailpit; o restante do link (o token
+de ação) funciona igual em qualquer um dos dois hosts.
+
 ## Como testar
 
 ```bash
@@ -135,8 +156,10 @@ dotnet test
 Cada serviço tem seu(s) projeto(s) de teste em `tests/`. `identity-api` tem dois:
 `IdentityApi.Domain.Tests` (unitário, `CpfValidator`, sem infraestrutura) e `IdentityApi.Tests`
 (integração — sobe um **Keycloak real e efêmero via Testcontainers**, com o mesmo
-`realm-clientes.json` importado; cobre cadastro (`POST /clientes`, não mocka a Admin API) e
-login (direto no Keycloak, ROPC via `vendas-frontend`) de ponta a ponta). `vendas-api.Tests`
+`realm-clientes.json` importado; cobre cadastro (`POST /clientes`, não mocka a Admin API),
+login (direto no Keycloak, ROPC via `vendas-frontend`) e recuperação de senha (Keycloak +
+**Mailpit reais**, na mesma rede Docker do teste — confirma que o e-mail chega no destinatário
+certo via API do Mailpit) de ponta a ponta). `vendas-api.Tests`
 segue o mesmo padrão (Keycloak real via Testcontainers) e cobre a validação de token
 (`/whoami`, `/whoami/cliente`) — token válido, sem token, assinatura adulterada, e com/sem a
 role `cliente`. `gateway` ainda só cobre o esqueleto (`GET /health`).
