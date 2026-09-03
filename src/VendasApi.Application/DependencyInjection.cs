@@ -8,6 +8,7 @@ public static class DependencyInjection
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
         services.AddScoped<ICadastrarVeiculoUseCase, CadastrarVeiculoUseCase>();
+        services.AddScoped<IEditarVeiculoUseCase, EditarVeiculoUseCase>();
         return services;
     }
 }

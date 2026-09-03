@@ -23,17 +23,6 @@ public class CadastrarVeiculoUseCase(IVeiculoRepository veiculoRepository) : ICa
 
         await veiculoRepository.AdicionarAsync(veiculo, cancellationToken);
 
-        return new VeiculoResult
-        {
-            Id = veiculo.Id,
-            Marca = veiculo.Marca,
-            Modelo = veiculo.Modelo,
-            Ano = veiculo.Ano,
-            Cor = veiculo.Cor,
-            Preco = veiculo.Preco,
-            Placa = veiculo.Placa,
-            Status = veiculo.Status.ToString(),
-            CriadoEm = veiculo.CriadoEm,
-        };
+        return veiculo.ToResult();
     }
 }

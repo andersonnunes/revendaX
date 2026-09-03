@@ -13,5 +13,9 @@ public interface IVeiculoRepository
 {
     Task<Veiculo?> ObterPorPlacaAsync(string placa, CancellationToken cancellationToken);
 
+    Task<Veiculo?> ObterPorIdAsync(Guid id, CancellationToken cancellationToken);
+
     Task AdicionarAsync(Veiculo veiculo, CancellationToken cancellationToken);
+
+    Task AtualizarAsync(Veiculo veiculo, CancellationToken cancellationToken);
 }
