@@ -19,6 +19,7 @@ public class DomainExceptionHandler : IExceptionHandler
         [typeof(VeiculoJaCadastradoException)] = (StatusCodes.Status409Conflict, "Já existe um veículo cadastrado com essa placa."),
         [typeof(VeiculoVendidoException)] = (StatusCodes.Status409Conflict, "Veículo vendido não pode ser editado."),
         [typeof(VeiculoNaoEncontradoException)] = (StatusCodes.Status404NotFound, "Veículo não encontrado."),
+        [typeof(VeiculoNaoPodeSerExcluidoException)] = (StatusCodes.Status409Conflict, "Só é possível excluir veículo disponível."),
     };
 
     public async ValueTask<bool> TryHandleAsync(

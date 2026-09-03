@@ -5,11 +5,12 @@ using VendasApi.Application.Veiculos;
 namespace VendasApi.Controllers;
 
 /// <summary>
-/// Cadastro (US2.1), edição (US2.2), listagem de veículos à venda (US2.3) e listagem de
-/// veículos vendidos (US2.4). Camada fina: só bind + delega ao caso de uso. Exceções de
-/// domínio (ano/preço/placa inválidos, placa duplicada, veículo vendido, veículo não
-/// encontrado) são traduzidas para status HTTP pelo
-/// <see cref="ExceptionHandling.DomainExceptionHandler"/> global, não aqui — ver Program.cs.
+/// Cadastro (US2.1), edição (US2.2), listagem de veículos à venda (US2.3), listagem de
+/// veículos vendidos (US2.4) e exclusão/soft delete (US2.5). Camada fina: só bind + delega ao
+/// caso de uso. Exceções de domínio (ano/preço/placa inválidos, placa duplicada, veículo
+/// vendido, veículo não encontrado, veículo não excluível) são traduzidas para status HTTP
+/// pelo <see cref="ExceptionHandling.DomainExceptionHandler"/> global, não aqui — ver
+/// Program.cs.
 /// </summary>
 [ApiController]
 [Route("veiculos")]
@@ -17,7 +18,8 @@ public class VeiculosController(
     ICadastrarVeiculoUseCase cadastrarVeiculoUseCase,
     IEditarVeiculoUseCase editarVeiculoUseCase,
     IListarVeiculosDisponiveisUseCase listarVeiculosDisponiveisUseCase,
-    IListarVeiculosVendidosUseCase listarVeiculosVendidosUseCase)
+    IListarVeiculosVendidosUseCase listarVeiculosVendidosUseCase,
+    IExcluirVeiculoUseCase excluirVeiculoUseCase)
     : ControllerBase
 {
     [HttpPost]
@@ -68,5 +70,22 @@ public class VeiculosController(
     {
         var resultado = await listarVeiculosVendidosUseCase.ExecutarAsync(cancellationToken);
         return Ok(resultado);
+    }
+
+    /// <summary>
+    /// Soft delete (US2.5) — idempotente: excluir um veículo já excluído retorna 204 de novo,
+    /// não erro (ver <see cref="Domain.Veiculos.Veiculo.Excluir"/>).
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "vendedor")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Excluir(Guid id, CancellationToken cancellationToken)
+    {
+        await excluirVeiculoUseCase.ExecutarAsync(id, cancellationToken);
+        return NoContent();
     }
 }
