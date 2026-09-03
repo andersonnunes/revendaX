@@ -40,16 +40,7 @@ public class Veiculo
     /// </summary>
     public static Veiculo Cadastrar(string marca, string modelo, int ano, string cor, decimal preco, string placa)
     {
-        var anoMaximo = DateTimeOffset.UtcNow.Year + 1;
-        if (ano < AnoMinimo || ano > anoMaximo)
-        {
-            throw new AnoInvalidoException();
-        }
-
-        if (preco <= 0)
-        {
-            throw new PrecoInvalidoException();
-        }
+        ValidarAnoEPreco(ano, preco);
 
         var placaNormalizada = PlacaValidator.Normalizar(placa);
         if (!PlacaValidator.IsValid(placaNormalizada))
@@ -70,5 +61,42 @@ public class Veiculo
             Ativo = true,
             CriadoEm = DateTimeOffset.UtcNow,
         };
+    }
+
+    /// <summary>
+    /// Atualiza marca/modelo/ano/cor/preço (US2.2) — `Placa` e `Status` são imutáveis por
+    /// este método de propósito (ver refinamento da US2.2: são identidade e ciclo de vida do
+    /// veículo, não "dados" no sentido desta operação). Bloqueia veículo `Vendido` — conflito
+    /// de estado (409), não erro de validação de entrada (422): por isso é checado antes da
+    /// validação de ano/preço, não junto dela.
+    /// </summary>
+    public void AtualizarDados(string marca, string modelo, int ano, string cor, decimal preco)
+    {
+        if (Status == StatusVeiculo.Vendido)
+        {
+            throw new VeiculoVendidoException();
+        }
+
+        ValidarAnoEPreco(ano, preco);
+
+        Marca = marca;
+        Modelo = modelo;
+        Ano = ano;
+        Cor = cor;
+        Preco = preco;
+    }
+
+    private static void ValidarAnoEPreco(int ano, decimal preco)
+    {
+        var anoMaximo = DateTimeOffset.UtcNow.Year + 1;
+        if (ano < AnoMinimo || ano > anoMaximo)
+        {
+            throw new AnoInvalidoException();
+        }
+
+        if (preco <= 0)
+        {
+            throw new PrecoInvalidoException();
+        }
     }
 }
