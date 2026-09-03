@@ -10,6 +10,7 @@ public static class DependencyInjection
         services.AddScoped<ICadastrarVeiculoUseCase, CadastrarVeiculoUseCase>();
         services.AddScoped<IEditarVeiculoUseCase, EditarVeiculoUseCase>();
         services.AddScoped<IListarVeiculosDisponiveisUseCase, ListarVeiculosDisponiveisUseCase>();
+        services.AddScoped<IListarVeiculosVendidosUseCase, ListarVeiculosVendidosUseCase>();
         return services;
     }
 }
