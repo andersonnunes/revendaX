@@ -28,4 +28,11 @@ public static class TestData
 
         return $"{Letra()}{Letra()}{Letra()}{Digito()}{Letra()}{Digito()}{Digito()}";
     }
+
+    /// <summary>
+    /// Preço aleatório num intervalo amplo — os testes de listagem/ordenação (US2.3) precisam
+    /// de preços que não colidam com o valor fixo de <see cref="NovoVeiculoValido"/> nem entre
+    /// si, já que a suíte inteira compartilha um único Postgres.
+    /// </summary>
+    public static decimal GerarPrecoUnico() => Math.Round((decimal)(Random.Shared.NextDouble() * 900_000) + 1_000, 2);
 }
