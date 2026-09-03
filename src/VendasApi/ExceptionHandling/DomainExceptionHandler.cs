@@ -17,6 +17,8 @@ public class DomainExceptionHandler : IExceptionHandler
         [typeof(PrecoInvalidoException)] = (StatusCodes.Status422UnprocessableEntity, "Preço deve ser maior que zero."),
         [typeof(PlacaInvalidaException)] = (StatusCodes.Status422UnprocessableEntity, "Placa em formato inválido."),
         [typeof(VeiculoJaCadastradoException)] = (StatusCodes.Status409Conflict, "Já existe um veículo cadastrado com essa placa."),
+        [typeof(VeiculoVendidoException)] = (StatusCodes.Status409Conflict, "Veículo vendido não pode ser editado."),
+        [typeof(VeiculoNaoEncontradoException)] = (StatusCodes.Status404NotFound, "Veículo não encontrado."),
     };
 
     public async ValueTask<bool> TryHandleAsync(
