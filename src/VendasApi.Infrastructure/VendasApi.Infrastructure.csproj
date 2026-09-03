@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\VendasApi.Application\VendasApi.Application.csproj" />
+    <ProjectReference Include="..\VendasApi.Domain\VendasApi.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Fixado explicitamente: sem isso, o Npgsql.EntityFrameworkCore.PostgreSQL 10.0.3 puxa
+         Microsoft.EntityFrameworkCore 10.0.4 como transitivo, e como o pacote Design abaixo
+         só flui internamente a este projeto (PrivateAssets=all), o VendasApi (host) que
+         referencia este projeto acaba resolvendo a versão mais baixa (10.0.4) sozinho — CS1705
+         de assembly desalinhado entre este projeto (compilado contra 10.0.11) e o host. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
