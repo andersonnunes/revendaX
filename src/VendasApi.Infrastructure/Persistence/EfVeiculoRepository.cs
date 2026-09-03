@@ -23,4 +23,11 @@ public class EfVeiculoRepository(VendasDbContext dbContext) : IVeiculoRepository
         dbContext.Veiculos.Update(veiculo);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Veiculo>> ListarPorStatusOrdenadosPorPrecoAsync(StatusVeiculo status, CancellationToken cancellationToken) =>
+        await dbContext.Veiculos
+            .Where(v => v.Status == status && v.Ativo)
+            .OrderBy(v => v.Preco)
+            .ThenBy(v => v.CriadoEm)
+            .ToListAsync(cancellationToken);
 }
