@@ -5,14 +5,17 @@ using VendasApi.Application.Veiculos;
 namespace VendasApi.Controllers;
 
 /// <summary>
-/// Cadastro (US2.1) e edição (US2.2) de veículos. Camada fina: só bind + delega ao caso de
-/// uso. Exceções de domínio (ano/preço/placa inválidos, placa duplicada, veículo vendido,
-/// veículo não encontrado) são traduzidas para status HTTP pelo
+/// Cadastro (US2.1), edição (US2.2) e listagem de veículos à venda (US2.3). Camada fina: só
+/// bind + delega ao caso de uso. Exceções de domínio (ano/preço/placa inválidos, placa
+/// duplicada, veículo vendido, veículo não encontrado) são traduzidas para status HTTP pelo
 /// <see cref="ExceptionHandling.DomainExceptionHandler"/> global, não aqui — ver Program.cs.
 /// </summary>
 [ApiController]
 [Route("veiculos")]
-public class VeiculosController(ICadastrarVeiculoUseCase cadastrarVeiculoUseCase, IEditarVeiculoUseCase editarVeiculoUseCase)
+public class VeiculosController(
+    ICadastrarVeiculoUseCase cadastrarVeiculoUseCase,
+    IEditarVeiculoUseCase editarVeiculoUseCase,
+    IListarVeiculosDisponiveisUseCase listarVeiculosDisponiveisUseCase)
     : ControllerBase
 {
     [HttpPost]
@@ -41,6 +44,15 @@ public class VeiculosController(ICadastrarVeiculoUseCase cadastrarVeiculoUseCase
     public async Task<IActionResult> Editar(Guid id, EditarVeiculoCommand command, CancellationToken cancellationToken)
     {
         var resultado = await editarVeiculoUseCase.ExecutarAsync(id, command, cancellationToken);
+        return Ok(resultado);
+    }
+
+    /// <summary>Público, sem `[Authorize]` — visitante/cliente navegam o catálogo sem login (US2.3).</summary>
+    [HttpGet]
+    [ProducesResponseType(typeof(IReadOnlyList<VeiculoResult>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ListarDisponiveis(CancellationToken cancellationToken)
+    {
+        var resultado = await listarVeiculosDisponiveisUseCase.ExecutarAsync(cancellationToken);
         return Ok(resultado);
     }
 }
