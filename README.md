@@ -21,10 +21,11 @@ planejamento da atividade acadêmica, não parte da entrega.
 > **Status atual**: Épico 1 (Identidade) completo — cadastro (US1.1), login direto no Keycloak
 > (US1.2), validação de token no `vendas-api` via JWKS (US1.3, endpoint `/whoami` de
 > diagnóstico), recuperação de senha (US1.4) e usuário `vendedor` provisionado no realm
-> (US1.5). Épico 2 (Veículos) em andamento — cadastro (US2.1), edição (US2.2) e listagem
-> pública de veículos à venda (US2.3), `vendas-api` já com Clean Architecture e persistência
-> própria (EF Core + Postgres). `gateway` ainda é só o esqueleto (build, testes, Docker,
-> roteamento); resto do Épico 2 e o Épico 3 (compras) ainda não implementados.
+> (US1.5). Épico 2 (Veículos) em andamento — cadastro (US2.1), edição (US2.2), listagem
+> pública de veículos à venda (US2.3) e listagem restrita de veículos vendidos (US2.4),
+> `vendas-api` já com Clean Architecture e persistência própria (EF Core + Postgres).
+> `gateway` ainda é só o esqueleto (build, testes, Docker, roteamento); resto do Épico 2 e o
+> Épico 3 (compras) ainda não implementados.
 
 ## Como rodar localmente
 
@@ -199,6 +200,18 @@ curl http://localhost:8080/vendas/veiculos
 
 Lista vazia (`[]`, não 404) se não houver nenhum veículo `Disponivel`.
 
+## Testar a listagem de veículos vendidos (US2.4)
+
+`GET /veiculos/vendidos` — restrito à role `vendedor` (não é vitrine pública, é
+acompanhamento comercial). Mesma ordenação por preço ascendente:
+
+```bash
+curl http://localhost:8080/vendas/veiculos/vendidos -H "Authorization: Bearer $TOKEN"
+# 200 — só veículos com status: Vendido
+```
+
+Sem token → 401; token de comprador (sem role `vendedor`) → 403.
+
 ## Testar a recuperação de senha (US1.4)
 
 `identity-api` só dispara o e-mail — a troca de senha acontece na página hospedada do
@@ -237,9 +250,10 @@ mesma rede Docker do teste, confirmando que o e-mail chega via API do Mailpit).
 `VendasApi.Tests` (integração — Keycloak **e** Postgres reais e efêmeros, compartilhados por
 todas as classes de teste do projeto via `[Collection]`, para não subir um par de containers
 por classe; cobre validação de token — `/whoami`, `/whoami/cliente`, `/whoami/vendedor` —,
-cadastro (`POST /veiculos`), edição (`PUT /veiculos/{id}`) e listagem pública
-(`GET /veiculos`) de veículo, incluindo consultas diretas ao Postgres do teste para confirmar
-que os dados persistidos batem com o que foi enviado, não só a resposta HTTP).
+cadastro (`POST /veiculos`), edição (`PUT /veiculos/{id}`) e as duas listagens
+(`GET /veiculos`, pública; `GET /veiculos/vendidos`, restrita a `vendedor`), incluindo
+consultas diretas ao Postgres do teste para confirmar que os dados persistidos batem com o
+que foi enviado, não só a resposta HTTP).
 
 `gateway` ainda só cobre o esqueleto (`GET /health`).
 
