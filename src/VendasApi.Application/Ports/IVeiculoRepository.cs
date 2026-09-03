@@ -18,4 +18,11 @@ public interface IVeiculoRepository
     Task AdicionarAsync(Veiculo veiculo, CancellationToken cancellationToken);
 
     Task AtualizarAsync(Veiculo veiculo, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Filtra por status e ordena por preço ascendente (desempate por `CriadoEm` ascendente)
+    /// — parametrizado por status, não um método fixo tipo `ListarDisponiveisAsync`, porque a
+    /// US2.4 precisa exatamente da mesma operação para `Vendido` (ver refinamento da US2.3).
+    /// </summary>
+    Task<IReadOnlyList<Veiculo>> ListarPorStatusOrdenadosPorPrecoAsync(StatusVeiculo status, CancellationToken cancellationToken);
 }
