@@ -21,11 +21,11 @@ planejamento da atividade acadêmica, não parte da entrega.
 > **Status atual**: Épico 1 (Identidade) completo — cadastro (US1.1), login direto no Keycloak
 > (US1.2), validação de token no `vendas-api` via JWKS (US1.3, endpoint `/whoami` de
 > diagnóstico), recuperação de senha (US1.4) e usuário `vendedor` provisionado no realm
-> (US1.5). Épico 2 (Veículos) em andamento — cadastro (US2.1), edição (US2.2), listagem
-> pública de veículos à venda (US2.3) e listagem restrita de veículos vendidos (US2.4),
-> `vendas-api` já com Clean Architecture e persistência própria (EF Core + Postgres).
-> `gateway` ainda é só o esqueleto (build, testes, Docker, roteamento); resto do Épico 2 e o
-> Épico 3 (compras) ainda não implementados.
+> (US1.5). **Épico 2 (Veículos) completo** — cadastro (US2.1), edição (US2.2), listagem
+> pública de veículos à venda (US2.3), listagem restrita de veículos vendidos (US2.4) e
+> exclusão/soft delete (US2.5), `vendas-api` já com Clean Architecture e persistência própria
+> (EF Core + Postgres). `gateway` ainda é só o esqueleto (build, testes, Docker, roteamento);
+> Épico 3 (compras) ainda não implementado.
 
 ## Como rodar localmente
 
@@ -212,6 +212,20 @@ curl http://localhost:8080/vendas/veiculos/vendidos -H "Authorization: Bearer $T
 
 Sem token → 401; token de comprador (sem role `vendedor`) → 403.
 
+## Testar a exclusão de veículo (US2.5)
+
+`DELETE /veiculos/{id}` — soft delete (a linha continua no banco, só `ativo` vira `false`;
+some da listagem pública). Só permitido em veículo `Disponivel`; idempotente (excluir de novo
+retorna 204 outra vez, não erro):
+
+```bash
+curl -X DELETE http://localhost:8080/vendas/veiculos/{id} -H "Authorization: Bearer $TOKEN"
+# 204 No Content
+```
+
+Veículo `Reservado`/`Vendido` → 409; `id` inexistente → 404; sem token/role `vendedor` →
+401/403.
+
 ## Testar a recuperação de senha (US1.4)
 
 `identity-api` só dispara o e-mail — a troca de senha acontece na página hospedada do
@@ -250,10 +264,10 @@ mesma rede Docker do teste, confirmando que o e-mail chega via API do Mailpit).
 `VendasApi.Tests` (integração — Keycloak **e** Postgres reais e efêmeros, compartilhados por
 todas as classes de teste do projeto via `[Collection]`, para não subir um par de containers
 por classe; cobre validação de token — `/whoami`, `/whoami/cliente`, `/whoami/vendedor` —,
-cadastro (`POST /veiculos`), edição (`PUT /veiculos/{id}`) e as duas listagens
-(`GET /veiculos`, pública; `GET /veiculos/vendidos`, restrita a `vendedor`), incluindo
-consultas diretas ao Postgres do teste para confirmar que os dados persistidos batem com o
-que foi enviado, não só a resposta HTTP).
+cadastro (`POST /veiculos`), edição (`PUT /veiculos/{id}`), as duas listagens
+(`GET /veiculos`, pública; `GET /veiculos/vendidos`, restrita a `vendedor`) e exclusão/soft
+delete (`DELETE /veiculos/{id}`), incluindo consultas diretas ao Postgres do teste para
+confirmar que os dados persistidos batem com o que foi enviado, não só a resposta HTTP).
 
 `gateway` ainda só cobre o esqueleto (`GET /health`).
 
