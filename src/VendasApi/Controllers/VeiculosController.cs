@@ -5,9 +5,10 @@ using VendasApi.Application.Veiculos;
 namespace VendasApi.Controllers;
 
 /// <summary>
-/// Cadastro (US2.1), edição (US2.2) e listagem de veículos à venda (US2.3). Camada fina: só
-/// bind + delega ao caso de uso. Exceções de domínio (ano/preço/placa inválidos, placa
-/// duplicada, veículo vendido, veículo não encontrado) são traduzidas para status HTTP pelo
+/// Cadastro (US2.1), edição (US2.2), listagem de veículos à venda (US2.3) e listagem de
+/// veículos vendidos (US2.4). Camada fina: só bind + delega ao caso de uso. Exceções de
+/// domínio (ano/preço/placa inválidos, placa duplicada, veículo vendido, veículo não
+/// encontrado) são traduzidas para status HTTP pelo
 /// <see cref="ExceptionHandling.DomainExceptionHandler"/> global, não aqui — ver Program.cs.
 /// </summary>
 [ApiController]
@@ -15,7 +16,8 @@ namespace VendasApi.Controllers;
 public class VeiculosController(
     ICadastrarVeiculoUseCase cadastrarVeiculoUseCase,
     IEditarVeiculoUseCase editarVeiculoUseCase,
-    IListarVeiculosDisponiveisUseCase listarVeiculosDisponiveisUseCase)
+    IListarVeiculosDisponiveisUseCase listarVeiculosDisponiveisUseCase,
+    IListarVeiculosVendidosUseCase listarVeiculosVendidosUseCase)
     : ControllerBase
 {
     [HttpPost]
@@ -53,6 +55,18 @@ public class VeiculosController(
     public async Task<IActionResult> ListarDisponiveis(CancellationToken cancellationToken)
     {
         var resultado = await listarVeiculosDisponiveisUseCase.ExecutarAsync(cancellationToken);
+        return Ok(resultado);
+    }
+
+    /// <summary>Restrito a `vendedor` — acompanhamento comercial, não vitrine pública (US2.4).</summary>
+    [HttpGet("vendidos")]
+    [Authorize(Roles = "vendedor")]
+    [ProducesResponseType(typeof(IReadOnlyList<VeiculoResult>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ListarVendidos(CancellationToken cancellationToken)
+    {
+        var resultado = await listarVeiculosVendidosUseCase.ExecutarAsync(cancellationToken);
         return Ok(resultado);
     }
 }
