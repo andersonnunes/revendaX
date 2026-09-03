@@ -86,6 +86,24 @@ public class Veiculo
         Preco = preco;
     }
 
+    /// <summary>
+    /// Soft delete (US2.5) — só permitido em <see cref="StatusVeiculo.Disponivel"/> (mais
+    /// restritivo que <see cref="AtualizarDados"/>, que só bloqueia `Vendido`: excluir tira o
+    /// veículo inteiramente de vista, o que poderia esconder uma reserva em andamento, ver
+    /// refinamento da US2.5). Idempotente por natureza — excluir não altera `Status`, então
+    /// chamar de novo num veículo já excluído passa pelo mesmo guard clause e apenas reatribui
+    /// `Ativo = false` a um campo que já é `false`, sem efeito colateral novo.
+    /// </summary>
+    public void Excluir()
+    {
+        if (Status != StatusVeiculo.Disponivel)
+        {
+            throw new VeiculoNaoPodeSerExcluidoException();
+        }
+
+        Ativo = false;
+    }
+
     private static void ValidarAnoEPreco(int ano, decimal preco)
     {
         var anoMaximo = DateTimeOffset.UtcNow.Year + 1;

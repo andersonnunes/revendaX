@@ -98,7 +98,7 @@ public class VeiculoTests
     public void AtualizarDados_VeiculoVendido_LancaVeiculoVendidoExceptionENaoAlteraNada()
     {
         var veiculo = Veiculo.Cadastrar("Fiat", "Argo", 2024, "Branco", 89900.00m, "ABC1D23");
-        MarcarComoVendido(veiculo);
+        AjustarStatus(veiculo, StatusVeiculo.Vendido);
 
         Assert.Throws<VeiculoVendidoException>(() =>
             veiculo.AtualizarDados("Fiat", "Mobi", 2025, "Prata", 85000.00m));
@@ -126,14 +126,49 @@ public class VeiculoTests
             veiculo.AtualizarDados("Fiat", "Argo", 2024, "Branco", 0m));
     }
 
+    [Fact]
+    public void Excluir_VeiculoDisponivel_TornaInativo()
+    {
+        var veiculo = Veiculo.Cadastrar("Fiat", "Argo", 2024, "Branco", 89900.00m, "ABC1D23");
+
+        veiculo.Excluir();
+
+        Assert.False(veiculo.Ativo);
+    }
+
+    [Fact]
+    public void Excluir_VeiculoJaExcluido_NaoLancaExcecao()
+    {
+        var veiculo = Veiculo.Cadastrar("Fiat", "Argo", 2024, "Branco", 89900.00m, "ABC1D23");
+        veiculo.Excluir();
+
+        veiculo.Excluir(); // idempotente — não deve lançar
+
+        Assert.False(veiculo.Ativo);
+    }
+
+    [Theory]
+    [InlineData(StatusVeiculo.Reservado)]
+    [InlineData(StatusVeiculo.Vendido)]
+    public void Excluir_VeiculoNaoDisponivel_LancaVeiculoNaoPodeSerExcluidoExceptionENaoAlteraAtivo(StatusVeiculo status)
+    {
+        var veiculo = Veiculo.Cadastrar("Fiat", "Argo", 2024, "Branco", 89900.00m, "ABC1D23");
+        AjustarStatus(veiculo, status);
+
+        Assert.Throws<VeiculoNaoPodeSerExcluidoException>(veiculo.Excluir);
+
+        Assert.True(veiculo.Ativo);
+    }
+
     /// <summary>
-    /// Não existe (ainda) nenhuma operação pública que leve um veículo a `Vendido` — essa
-    /// transição só chega no Épico 3. Reflexão é o jeito honesto de testar o guard clause de
-    /// `AtualizarDados` sem esperar o Épico 3 nem vazar um setter de teste na entidade.
+    /// Não existe (ainda) nenhuma operação pública que leve um veículo a `Reservado`/`Vendido`
+    /// — essa transição só chega no Épico 3. Reflexão é o jeito honesto de testar os guard
+    /// clauses de `AtualizarDados`/`Excluir` sem esperar o Épico 3 nem vazar um setter de
+    /// teste na entidade.
     /// </summary>
-    private static void MarcarComoVendido(Veiculo veiculo)
+    private static void AjustarStatus(Veiculo veiculo, StatusVeiculo status)
     {
         var propriedade = typeof(Veiculo).GetProperty(nameof(Veiculo.Status))!;
-        propriedade.SetValue(veiculo, StatusVeiculo.Vendido);
+        propriedade.SetValue(veiculo, status);
     }
 }
