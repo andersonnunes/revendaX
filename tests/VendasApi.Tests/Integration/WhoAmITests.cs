@@ -6,23 +6,24 @@ namespace VendasApi.Tests.Integration;
 /// Cenários de teste da validação de token (JWT Bearer + JWKS) contra um Keycloak real
 /// efêmero — não mockado.
 /// </summary>
-public class WhoAmITests : IClassFixture<KeycloakContainerFixture>, IAsyncLifetime
+[Collection(nameof(VendasApiIntegrationCollection))]
+public class WhoAmITests : IAsyncLifetime
 {
-    private readonly KeycloakContainerFixture _keycloak;
+    private readonly VendasApiTestEnvironment _env;
     private VendasApiFactory _factory = null!;
     private HttpClient _client = null!;
     private KeycloakTestHelper _keycloakHelper = null!;
 
-    public WhoAmITests(KeycloakContainerFixture keycloak)
+    public WhoAmITests(VendasApiTestEnvironment env)
     {
-        _keycloak = keycloak;
+        _env = env;
     }
 
     public Task InitializeAsync()
     {
-        _factory = new VendasApiFactory(_keycloak.BaseUrl);
+        _factory = new VendasApiFactory(_env.KeycloakBaseUrl, _env.PostgresConnectionString);
         _client = _factory.CreateClient();
-        _keycloakHelper = new KeycloakTestHelper(new HttpClient { BaseAddress = new Uri(_keycloak.BaseUrl) });
+        _keycloakHelper = new KeycloakTestHelper(new HttpClient { BaseAddress = new Uri(_env.KeycloakBaseUrl) });
         return Task.CompletedTask;
     }
 
