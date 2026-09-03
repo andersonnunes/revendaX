@@ -21,10 +21,10 @@ planejamento da atividade acadêmica, não parte da entrega.
 > **Status atual**: Épico 1 (Identidade) completo — cadastro (US1.1), login direto no Keycloak
 > (US1.2), validação de token no `vendas-api` via JWKS (US1.3, endpoint `/whoami` de
 > diagnóstico), recuperação de senha (US1.4) e usuário `vendedor` provisionado no realm
-> (US1.5). Épico 2 (Veículos) iniciado — cadastro de veículo (US2.1), `vendas-api` já com
-> Clean Architecture e persistência própria (EF Core + Postgres). `gateway` ainda é só o
-> esqueleto (build, testes, Docker, roteamento); resto do Épico 2 e o Épico 3 (compras) ainda
-> não implementados.
+> (US1.5). Épico 2 (Veículos) em andamento — cadastro (US2.1) e edição (US2.2) de veículo,
+> `vendas-api` já com Clean Architecture e persistência própria (EF Core + Postgres).
+> `gateway` ainda é só o esqueleto (build, testes, Docker, roteamento); resto do Épico 2 e o
+> Épico 3 (compras) ainda não implementados.
 
 ## Como rodar localmente
 
@@ -172,6 +172,21 @@ Placa duplicada → 409; ano fora do intervalo (1950 até o ano atual + 1), pre�
 formato inválido (nem padrão antigo `AAA9999`, nem Mercosul `AAA9A99`) → 422; campo obrigatório
 ausente → 400; sem token → 401; token sem a role `vendedor` → 403.
 
+## Testar a edição de veículo (US2.2)
+
+`PUT /veiculos/{id}` — mesma autorização do cadastro. `placa` e `status` são imutáveis por
+este endpoint (não fazem parte do corpo):
+
+```bash
+curl -X PUT http://localhost:8080/vendas/veiculos/{id} \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"marca": "Fiat", "modelo": "Argo", "ano": 2025, "cor": "Prata", "preco": 85000.00}'
+# 200 OK — corpo com os dados atualizados; placa/status inalterados
+```
+
+Veículo `id` inexistente → 404; veículo com `status: Vendido` → 409 (conflito de estado, não
+editável); ano/preço inválidos → 422; campo obrigatório ausente → 400.
+
 ## Testar a recuperação de senha (US1.4)
 
 `identity-api` só dispara o e-mail — a troca de senha acontece na página hospedada do
@@ -209,9 +224,10 @@ mesma rede Docker do teste, confirmando que o e-mail chega via API do Mailpit).
 `vendas-api`: `VendasApi.Domain.Tests` (unitário, `PlacaValidator` + `Veiculo`) e
 `VendasApi.Tests` (integração — Keycloak **e** Postgres reais e efêmeros, compartilhados por
 todas as classes de teste do projeto via `[Collection]`, para não subir um par de containers
-por classe; cobre validação de token — `/whoami`, `/whoami/cliente`, `/whoami/vendedor` — e
-cadastro de veículo — `POST /veiculos`, incluindo uma consulta direta ao Postgres do teste
-para confirmar que os dados persistidos batem com o que foi enviado, não só a resposta HTTP).
+por classe; cobre validação de token — `/whoami`, `/whoami/cliente`, `/whoami/vendedor` —,
+cadastro (`POST /veiculos`) e edição (`PUT /veiculos/{id}`) de veículo, incluindo consultas
+diretas ao Postgres do teste para confirmar que os dados persistidos batem com o que foi
+enviado, não só a resposta HTTP).
 
 `gateway` ainda só cobre o esqueleto (`GET /health`).
 
