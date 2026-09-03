@@ -12,4 +12,10 @@
     <PackageReference Include="Scalar.AspNetCore" Version="2.17.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\VendasApi.Application\VendasApi.Application.csproj" />
+    <ProjectReference Include="..\VendasApi.Domain\VendasApi.Domain.csproj" />
+    <ProjectReference Include="..\VendasApi.Infrastructure\VendasApi.Infrastructure.csproj" />
+  </ItemGroup>
+
 </Project>

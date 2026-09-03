@@ -1,8 +1,13 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
+using VendasApi.Application;
 using VendasApi.Auth;
+using VendasApi.ExceptionHandling;
+using VendasApi.Infrastructure;
+using VendasApi.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,6 +44,14 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
 builder.Services.AddAuthorization();
 builder.Services.AddTransient<IClaimsTransformation, RealmRolesClaimsTransformation>();
 
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure();
+
+// Mapeia exceções de negócio (Domain) para status HTTP num único lugar — mesmo padrão do
+// `identity-api` (ver ExceptionHandling/DomainExceptionHandler.cs).
+builder.Services.AddExceptionHandler<DomainExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -47,6 +60,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
+
+app.UseExceptionHandler();
 
 app.UseHttpsRedirection();
 
@@ -57,6 +72,15 @@ app.MapControllers();
 
 // Usado para confirmar que o container subiu corretamente (docker-compose healthcheck manual).
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "vendas-api" }));
+
+// Migração automática do schema no startup (US2.1) — mesmo racional do import automático do
+// realm do Keycloak: nenhum passo manual entre "subir o container" e "sistema no ar", já
+// documentado como decisão consciente na US2.1.
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<VendasDbContext>();
+    dbContext.Database.Migrate();
+}
 
 app.Run();
 
