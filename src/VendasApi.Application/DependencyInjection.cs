@@ -15,6 +15,7 @@ public static class DependencyInjection
         services.AddScoped<IExcluirVeiculoUseCase, ExcluirVeiculoUseCase>();
         services.AddScoped<IIniciarCompraUseCase, IniciarCompraUseCase>();
         services.AddScoped<IConfirmarPagamentoUseCase, ConfirmarPagamentoUseCase>();
+        services.AddScoped<IConsultarCompraUseCase, ConsultarCompraUseCase>();
         return services;
     }
 }
