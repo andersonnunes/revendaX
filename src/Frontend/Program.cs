@@ -1,6 +1,5 @@
 using Frontend;
 using Frontend.Auth;
-using Frontend.Services;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
@@ -38,9 +37,5 @@ builder.Services.AddHttpClient("Gateway", client => client.BaseAddress = new Uri
         return handler;
     });
 builder.Services.AddHttpClient("GatewayPublico", client => client.BaseAddress = new Uri(gatewayBaseAddress));
-
-// Histórico de compras deste navegador (US4.4) — ver HistoricoComprasLocal para o porquê de
-// não ser uma listagem vinda do backend.
-builder.Services.AddScoped<HistoricoComprasLocal>();
 
 await builder.Build().RunAsync();

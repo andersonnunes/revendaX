@@ -3,9 +3,7 @@
 @using System.Globalization
 @using System.Net
 @using Frontend.Models
-@using Frontend.Services
 @inject IHttpClientFactory HttpClientFactory
-@inject HistoricoComprasLocal Historico
 
 <PageTitle>Minha compra — RevendaX</PageTitle>
 
@@ -54,11 +52,7 @@
     // contrário de US4.2/US4.3, esta chamada precisa mesmo do token.
     private HttpClient Gateway => HttpClientFactory.CreateClient("Gateway");
 
-    protected override async Task OnInitializedAsync()
-    {
-        await Historico.AdicionarAsync(Id);
-        await CarregarAsync();
-    }
+    protected override Task OnInitializedAsync() => CarregarAsync();
 
     private async Task CarregarAsync()
     {
