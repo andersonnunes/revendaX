@@ -1,0 +1,75 @@
+@page "/minhas-compras"
+@attribute [Authorize]
+@using System.Globalization
+@using Frontend.Models
+@using Frontend.Services
+@inject IHttpClientFactory HttpClientFactory
+@inject HistoricoComprasLocal Historico
+
+<PageTitle>Minhas compras — RevendaX</PageTitle>
+
+<main class="main-content">
+    <h2>Minhas compras</h2>
+    <p class="subtitle">
+        Histórico deste navegador — uma compra feita em outro navegador ou dispositivo não
+        aparece aqui (ver "Perguntas em aberto" da US4.4).
+    </p>
+
+    @if (carregando)
+    {
+        <p class="list-placeholder">Carregando…</p>
+    }
+    else if (compras.Count == 0)
+    {
+        <p class="empty-state">Nenhuma compra ainda. <a href="/veiculos">Ver catálogo</a>.</p>
+    }
+    else
+    {
+        <div class="vehicle-grid">
+            @foreach (var compra in compras)
+            {
+                <a href="@($"/compras/{compra.Id}")" class="glass-card vehicle-card" style="text-decoration: none; color: inherit;">
+                    <span class="status-badge @compra.Status.ToLowerInvariant()">@compra.Status</span>
+                    <span class="price">@compra.Preco.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))</span>
+                    <div class="specs">
+                        <span>@compra.CriadoEm.ToLocalTime().ToString("g")</span>
+                    </div>
+                </a>
+            }
+        </div>
+    }
+</main>
+
+@code {
+    private List<CompraDto> compras = [];
+    private bool carregando = true;
+
+    // "Gateway" (autenticado) — mesma razão da CompraStatus.razor.
+    private HttpClient Gateway => HttpClientFactory.CreateClient("Gateway");
+
+    protected override async Task OnInitializedAsync()
+    {
+        var ids = await Historico.ListarAsync();
+        var resultado = new List<CompraDto>();
+
+        foreach (var id in ids)
+        {
+            try
+            {
+                var dto = await Gateway.GetFromJsonAsync<CompraDto>($"vendas/compras/{id}");
+                if (dto is not null)
+                {
+                    resultado.Add(dto);
+                }
+            }
+            catch (HttpRequestException)
+            {
+                // Uma compra que sumiu (ou o backend fora do ar num item específico) não deve
+                // travar a lista inteira — só fica de fora desta renderização.
+            }
+        }
+
+        compras = resultado;
+        carregando = false;
+    }
+}

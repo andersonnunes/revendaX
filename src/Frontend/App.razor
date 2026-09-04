@@ -1,7 +1,23 @@
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly" NotFoundPage="typeof(Pages.NotFound)">
         <Found Context="routeData">
-            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    @* Primeira vez que uma página com [Authorize] existe no app (US4.4,
+                       /compras/{id} e /minhas-compras) — sem este template, AuthorizeRouteView
+                       mostra o texto default em inglês do Blazor ("Not authorized") sem nenhum
+                       estilo. Mesma linguagem visual do resto do app (glass-card, botão
+                       primary), sem redirect automático — mesmo padrão já usado no
+                       LoginDisplay (mostra "Entrar", não força navegação sozinho). *@
+                    <main class="main-content">
+                        <div class="glass-card" style="max-width: 420px; margin: 60px auto; text-align: center;">
+                            <h2>Você precisa entrar</h2>
+                            <p class="subtitle">Esta página exige uma conta autenticada.</p>
+                            <a class="btn primary block" href="authentication/login">Entrar</a>
+                        </div>
+                    </main>
+                </NotAuthorized>
+            </AuthorizeRouteView>
             <FocusOnNavigate RouteData="@routeData" Selector="h1" />
         </Found>
     </Router>
