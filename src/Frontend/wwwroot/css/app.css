@@ -232,6 +232,44 @@ h2 { font-family: var(--font-header); font-size: 20px; margin: 0 0 4px; display:
 @keyframes toastIn { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
 /*
+ * #blazor-error-ui não vem do projeto de origem — é o contrato padrão do template Blazor
+ * WebAssembly (o runtime seta `style.display = "block"` nesse ID, hardcoded, quando ocorre um
+ * erro não tratado). Sem `display: none` aqui, a div fica visível (sem estilo nenhum) o tempo
+ * todo, não só em erro — precisa existir mesmo não vindo do CSS reaproveitado.
+ */
+#blazor-error-ui {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 2000;
+  background: var(--bg-card);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-top: 1px solid var(--border-color);
+  border-left: 4px solid var(--error);
+  color: var(--text-primary);
+  padding: 14px 48px 14px 18px;
+  font-size: 14px;
+  box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.5);
+}
+#blazor-error-ui .reload {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  margin-left: 8px;
+  cursor: pointer;
+}
+#blazor-error-ui .dismiss {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+#blazor-error-ui .dismiss:hover { color: var(--text-primary); }
+
+/*
  * Componentes abaixo são específicos do domínio de revenda de veículos — não existiam no
  * projeto de origem (que era sobre upload/processamento de vídeo). Ponto de partida simples;
  * cada história do Épico 4 deve refinar o que precisar além disto.
