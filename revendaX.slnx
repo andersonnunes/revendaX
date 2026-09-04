@@ -1,6 +1,5 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/Frontend/Frontend.csproj" />
     <Project Path="src/Gateway/Gateway.csproj" />
     <Project Path="src/IdentityApi.Application/IdentityApi.Application.csproj" />
     <Project Path="src/IdentityApi.Domain/IdentityApi.Domain.csproj" />

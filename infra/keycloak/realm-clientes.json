@@ -947,20 +947,12 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "redirectUris": [
-        "http://localhost:5290/authentication/login-callback",
-        "http://localhost:5290/authentication/logout-callback",
-        "http://localhost:8082/authentication/login-callback",
-        "http://localhost:8082/authentication/logout-callback"
-      ],
-      "webOrigins": [
-        "http://localhost:5290",
-        "http://localhost:8082"
-      ],
+      "redirectUris": [],
+      "webOrigins": [],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
-      "standardFlowEnabled": true,
+      "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
@@ -971,8 +963,7 @@
         "realm_client": "false",
         "backchannel.logout.session.required": "true",
         "post.logout.redirect.uris": "+",
-        "backchannel.logout.revoke.offline.tokens": "false",
-        "pkce.code.challenge.method": "S256"
+        "backchannel.logout.revoke.offline.tokens": "false"
       },
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": true,

@@ -16,8 +16,7 @@ namespace VendasApi.Controllers;
 public class ComprasController(
     IIniciarCompraUseCase iniciarCompraUseCase,
     IConfirmarPagamentoUseCase confirmarPagamentoUseCase,
-    IConsultarCompraUseCase consultarCompraUseCase,
-    IListarComprasDoClienteUseCase listarComprasDoClienteUseCase)
+    IConsultarCompraUseCase consultarCompraUseCase)
     : ControllerBase
 {
     [HttpPost]
@@ -53,26 +52,6 @@ public class ComprasController(
     public async Task<IActionResult> ConfirmarPagamento(Guid id, CancellationToken cancellationToken)
     {
         var resultado = await confirmarPagamentoUseCase.ExecutarAsync(id, cancellationToken);
-        return Ok(resultado);
-    }
-
-    /// <summary>
-    /// Lista todas as compras do cliente autenticado (US3.4, extensão) — o `clienteId` vem só
-    /// da claim `sub` do token, nunca de parâmetro de rota/query; um cliente não tem como pedir
-    /// a lista de outro. Sem paginação (mesma decisão já aceita nas listagens de veículo,
-    /// US2.3/US2.4) — nunca 404, lista vazia se o cliente não tiver nenhuma compra.
-    /// </summary>
-    [HttpGet]
-    [Authorize(Roles = "cliente")]
-    [ProducesResponseType(typeof(IReadOnlyList<CompraResult>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    public async Task<IActionResult> Listar(CancellationToken cancellationToken)
-    {
-        var clienteId = User.FindFirst("sub")?.Value
-            ?? throw new InvalidOperationException("Token autenticado sem claim 'sub'.");
-
-        var resultado = await listarComprasDoClienteUseCase.ExecutarAsync(clienteId, cancellationToken);
         return Ok(resultado);
     }
 

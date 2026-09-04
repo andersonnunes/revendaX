@@ -1,17 +1,14 @@
 # Ambiente de desenvolvimento local. Rodar a partir da raiz do repositório:
 #   docker compose -f infra/docker-compose.yml up --build
 #
-# Ponto de entrada único pra API: gateway (porta 8080), que roteia /identity/** para
-# identity-api e /vendas/** para vendas-api (YARP, ver src/Gateway/appsettings.json).
-# identity-api e vendas-api também têm porta própria exposta, só para debug direto sem passar
-# pelo gateway. O frontend bônus (porta 8082, Épico 4) fala com o gateway pra API e direto com
-# o Keycloak pra login (Authorization Code + PKCE) — não passa pelo gateway pra autenticar.
+# Ponto de entrada único: gateway (porta 8080), que roteia /identity/** para identity-api e
+# /vendas/** para vendas-api (YARP, ver src/Gateway/appsettings.json). identity-api e
+# vendas-api também têm porta própria exposta, só para debug direto sem passar pelo gateway.
 #
 # O Keycloak sobe com o realm `clientes` importado automaticamente
 # (infra/keycloak/realm-clientes.json) — client `identity-api` (confidencial, service account
-# com manage-users), client público `vendas-frontend` (ROPC pra testes/vídeo + Authorization
-# Code + PKCE pro frontend real, US4.1), role `cliente` (default role) e os user attributes
-# customizados (cpf, telefone) já configurados.
+# com manage-users), client público `vendas-frontend` (login via ROPC), role `cliente`
+# (default role) e os user attributes customizados (cpf, telefone) já configurados.
 #
 # IMPORTANTE: o Keycloak só reimporta esse arquivo se o realm ainda não existir no Postgres
 # dele (keycloak-db-data). Depois de editar o realm, use `docker compose down -v` antes do
@@ -31,18 +28,6 @@ services:
     depends_on:
       - identity-api
       - vendas-api
-
-  # Frontend bônus (Épico 4) — Blazor WebAssembly, servido como estático via nginx. Fala
-  # direto com o Keycloak (login) e com o gateway (API), nunca com identity-api/vendas-api
-  # diretamente — mesma regra de "porta única de entrada" do resto do projeto.
-  frontend:
-    build:
-      context: ..
-      dockerfile: src/Frontend/Dockerfile
-    ports:
-      - "8082:8080"
-    depends_on:
-      - gateway
 
   identity-api:
     build:
@@ -93,35 +78,11 @@ services:
       - KC_DB_URL=jdbc:postgresql://keycloak-db:5432/keycloak
       - KC_DB_USERNAME=keycloak
       - KC_DB_PASSWORD=keycloak
-      # Fixa o hostname que o Keycloak usa pra se descrever (claim `iss` dos tokens, US1.3, e
-      # todo link/URL que ele mesmo gera — página de login, e-mail de redefinição de senha,
-      # US1.4). Aponta pro endereço que o NAVEGADOR enxerga (localhost:8081), não pro hostname
-      # interno do Docker — corrigido na US4.1 (frontend bônus), quando o primeiro fluxo a
-      # exigir o navegador abrindo uma página *hospedada pelo Keycloak* (login via
-      # Authorization Code, não só POST direto no /token via ROPC) expôs que apontar pro
-      # hostname interno (`keycloak:8080`) deixava a própria página de login com um
-      # `action="http://keycloak:8080/..."` que o navegador do usuário não resolve — o mesmo
-      # problema, menos visível, já existia pro link de redefinição de senha da US1.4 (por
-      # isso aquela história documentava um workaround manual, hoje desnecessário).
-      #
-      # `identity-api`/`vendas-api` continuam alcançando o Keycloak pelo hostname interno
-      # (`Keycloak__BaseUrl=http://keycloak:8080`, only reachable dentro da rede do Docker) —
-      # isso não muda. O que muda é só a identidade que o Keycloak *declara ter*: a validação
-      # de token não compara contra o endereço usado pra buscar o JWKS/metadata (`Authority`),
-      # compara contra o `issuer` que o próprio documento de metadata reporta — que passa a
-      # ser `http://localhost:8081/realms/clientes`, batendo com o que os tokens de verdade
-      # carregam, já que ambos vêm do mesmo `KC_HOSTNAME`.
-      - KC_HOSTNAME=http://localhost:8081
-      # Sem isso, o *documento de metadata* (`.well-known/openid-configuration`) também
-      # reportaria `jwks_uri`/`token_endpoint`/etc. fixados em `localhost:8081` pra qualquer
-      # chamador — inclusive pro `vendas-api`, que busca esse documento pelo hostname interno
-      # (`keycloak:8080`) mas não consegue depois alcançar `localhost:8081` (de dentro do
-      # container, isso é o próprio container, não o host) pra buscar as chaves JWKS de fato.
-      # `true` faz o Keycloak resolver esses endpoints "de canal de retorno" dinamicamente, a
-      # partir do endereço que cada chamador de fato usou — o `issuer` continua fixo em
-      # `KC_HOSTNAME` (é o que precisa ser estável pra validação bater), só os endpoints
-      # operacionais viram dinâmicos.
-      - KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true
+      # Fixa o hostname usado no claim `iss` dos tokens (US1.3) — sem isso, o Keycloak calcula
+      # o issuer a partir do host:porta que cada chamador usou pra logar (ex.: localhost:8081
+      # do host), mas o vendas-api valida via hostname interno do Docker (keycloak:8080); os
+      # dois nunca bateriam, e todo token seria rejeitado com "issuer inválido".
+      - KC_HOSTNAME=http://keycloak:8080
       - KC_HOSTNAME_STRICT=true
     volumes:
       - ./keycloak/realm-clientes.json:/opt/keycloak/data/import/realm-clientes.json:ro
