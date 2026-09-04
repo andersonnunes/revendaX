@@ -4,8 +4,8 @@ using Microsoft.Extensions.Configuration;
 
 namespace VendasApi.Tests.Integration;
 
-/// <summary>WebApplicationFactory apontando o `vendas-api` para o Keycloak efêmero do teste.</summary>
-public class VendasApiFactory(string keycloakBaseUrl) : WebApplicationFactory<Program>
+/// <summary>WebApplicationFactory apontando o `vendas-api` para o Keycloak e o Postgres efêmeros do teste.</summary>
+public class VendasApiFactory(string keycloakBaseUrl, string postgresConnectionString) : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -14,6 +14,7 @@ public class VendasApiFactory(string keycloakBaseUrl) : WebApplicationFactory<Pr
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Keycloak:BaseUrl"] = keycloakBaseUrl,
+                ["ConnectionStrings:VendasDb"] = postgresConnectionString,
             });
         });
     }

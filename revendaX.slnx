@@ -6,11 +6,15 @@
     <Project Path="src/IdentityApi.Infrastructure/IdentityApi.Infrastructure.csproj" />
     <Project Path="src/IdentityApi/IdentityApi.csproj" />
     <Project Path="src/VendasApi/VendasApi.csproj" />
+    <Project Path="src/VendasApi.Application/VendasApi.Application.csproj" />
+    <Project Path="src/VendasApi.Domain/VendasApi.Domain.csproj" />
+    <Project Path="src/VendasApi.Infrastructure/VendasApi.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Gateway.Tests/Gateway.Tests.csproj" />
     <Project Path="tests/IdentityApi.Domain.Tests/IdentityApi.Domain.Tests.csproj" />
     <Project Path="tests/IdentityApi.Tests/IdentityApi.Tests.csproj" />
+    <Project Path="tests/VendasApi.Domain.Tests/VendasApi.Domain.Tests.csproj" />
     <Project Path="tests/VendasApi.Tests/VendasApi.Tests.csproj" />
   </Folder>
 </Solution>

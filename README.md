@@ -14,15 +14,18 @@ planejamento da atividade acadêmica, não parte da entrega.
 |---|---|---|
 | `gateway` | Porta única de entrada (YARP) — roteia `/identity/**` e `/vendas/**` | `8080` |
 | `identity-api` | Cadastro de clientes — única credencial com permissão de escrita no Keycloak | `5081` (debug direto) |
-| `vendas-api` | Catálogo de veículos e compras | `5082` (debug direto) |
+| `vendas-api` | Catálogo de veículos e compras (Postgres próprio, `vendas-db`) | `5082` (debug direto) |
 | Keycloak | Identity Provider (realm `clientes`, ainda não configurado — ver status abaixo) | `8081` |
 | Mailpit | SMTP fake de dev (US1.4) — captura os e-mails de redefinição de senha | `8025` (UI/API) |
 
 > **Status atual**: Épico 1 (Identidade) completo — cadastro (US1.1), login direto no Keycloak
 > (US1.2), validação de token no `vendas-api` via JWKS (US1.3, endpoint `/whoami` de
 > diagnóstico), recuperação de senha (US1.4) e usuário `vendedor` provisionado no realm
-> (US1.5). `gateway` ainda é só o esqueleto (build, testes, Docker, roteamento); Épicos 2/3
-> (veículos, compras) ainda não implementados.
+> (US1.5). **Épico 2 (Veículos) completo** — cadastro (US2.1), edição (US2.2), listagem
+> pública de veículos à venda (US2.3), listagem restrita de veículos vendidos (US2.4) e
+> exclusão/soft delete (US2.5), `vendas-api` já com Clean Architecture e persistência própria
+> (EF Core + Postgres). `gateway` ainda é só o esqueleto (build, testes, Docker, roteamento);
+> Épico 3 (compras) ainda não implementado.
 
 ## Como rodar localmente
 
@@ -150,6 +153,79 @@ curl http://localhost:8080/vendas/whoami/vendedor -H "Authorization: Bearer $TOK
 
 Um token de comprador (US1.1/US1.2) nesse mesmo endpoint → 403 (role `vendedor` ausente).
 
+## Testar o cadastro de veículo (US2.1)
+
+`POST /veiculos` exige token com a role `vendedor` — a migração do schema do `vendas-db` roda
+automaticamente no startup do `vendas-api` (sem passo manual):
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8081/realms/clientes/protocol/openid-connect/token \
+  -d "grant_type=password" -d "client_id=vendas-frontend" \
+  -d "username=vendedor@revendax.local" -d "password=VendedorDev123" | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+
+curl -X POST http://localhost:8080/vendas/veiculos \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"marca": "Fiat", "modelo": "Argo", "ano": 2024, "cor": "Branco", "preco": 89900.00, "placa": "ABC1D23"}'
+# 201 Created — { "id": "...", "status": "Disponivel", ... }
+```
+
+Placa duplicada → 409; ano fora do intervalo (1950 até o ano atual + 1), preço ≤ 0 ou placa em
+formato inválido (nem padrão antigo `AAA9999`, nem Mercosul `AAA9A99`) → 422; campo obrigatório
+ausente → 400; sem token → 401; token sem a role `vendedor` → 403.
+
+## Testar a edição de veículo (US2.2)
+
+`PUT /veiculos/{id}` — mesma autorização do cadastro. `placa` e `status` são imutáveis por
+este endpoint (não fazem parte do corpo):
+
+```bash
+curl -X PUT http://localhost:8080/vendas/veiculos/{id} \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"marca": "Fiat", "modelo": "Argo", "ano": 2025, "cor": "Prata", "preco": 85000.00}'
+# 200 OK — corpo com os dados atualizados; placa/status inalterados
+```
+
+Veículo `id` inexistente → 404; veículo com `status: Vendido` → 409 (conflito de estado, não
+editável); ano/preço inválidos → 422; campo obrigatório ausente → 400.
+
+## Testar a listagem de veículos à venda (US2.3)
+
+`GET /veiculos` é **público** — não exige token nem role. Retorna só veículos
+`status: Disponivel`, ordenados por preço ascendente (desempate por data de cadastro):
+
+```bash
+curl http://localhost:8080/vendas/veiculos
+# 200 — [ { "id": "...", "preco": 62000.00, "status": "Disponivel", ... }, ... ]
+```
+
+Lista vazia (`[]`, não 404) se não houver nenhum veículo `Disponivel`.
+
+## Testar a listagem de veículos vendidos (US2.4)
+
+`GET /veiculos/vendidos` — restrito à role `vendedor` (não é vitrine pública, é
+acompanhamento comercial). Mesma ordenação por preço ascendente:
+
+```bash
+curl http://localhost:8080/vendas/veiculos/vendidos -H "Authorization: Bearer $TOKEN"
+# 200 — só veículos com status: Vendido
+```
+
+Sem token → 401; token de comprador (sem role `vendedor`) → 403.
+
+## Testar a exclusão de veículo (US2.5)
+
+`DELETE /veiculos/{id}` — soft delete (a linha continua no banco, só `ativo` vira `false`;
+some da listagem pública). Só permitido em veículo `Disponivel`; idempotente (excluir de novo
+retorna 204 outra vez, não erro):
+
+```bash
+curl -X DELETE http://localhost:8080/vendas/veiculos/{id} -H "Authorization: Bearer $TOKEN"
+# 204 No Content
+```
+
+Veículo `Reservado`/`Vendido` → 409; `id` inexistente → 404; sem token/role `vendedor` →
+401/403.
+
 ## Testar a recuperação de senha (US1.4)
 
 `identity-api` só dispara o e-mail — a troca de senha acontece na página hospedada do
@@ -175,17 +251,25 @@ de ação) funciona igual em qualquer um dos dois hosts.
 dotnet test
 ```
 
-Cada serviço tem seu(s) projeto(s) de teste em `tests/`. `identity-api` tem dois:
-`IdentityApi.Domain.Tests` (unitário, `CpfValidator`, sem infraestrutura) e `IdentityApi.Tests`
-(integração — sobe um **Keycloak real e efêmero via Testcontainers**, com o mesmo
-`realm-clientes.json` importado; cobre cadastro (`POST /clientes`, não mocka a Admin API),
-login (direto no Keycloak, ROPC via `vendas-frontend`) e recuperação de senha (Keycloak +
-**Mailpit reais**, na mesma rede Docker do teste — confirma que o e-mail chega no destinatário
-certo via API do Mailpit) de ponta a ponta). `vendas-api.Tests`
-segue o mesmo padrão (Keycloak real via Testcontainers) e cobre a validação de token
-(`/whoami`, `/whoami/cliente`, `/whoami/vendedor`) — token válido, sem token, assinatura
-adulterada, com/sem a role `cliente`, e o usuário `vendedor` semeado (US1.5) vs. um comprador
-comum. `gateway` ainda só cobre o esqueleto (`GET /health`).
+Cada serviço tem seu(s) projeto(s) de teste em `tests/`, seguindo o mesmo padrão: um projeto
+unitário por Domain (sem infraestrutura) e um projeto de integração contra dependências reais
+via **Testcontainers** — nunca mock de banco, identity provider ou fila.
+
+`identity-api`: `IdentityApi.Domain.Tests` (unitário, `CpfValidator`) e `IdentityApi.Tests`
+(integração — Keycloak real e efêmero, com o mesmo `realm-clientes.json` importado; cobre
+cadastro, login e recuperação de senha, esta última também contra um **Mailpit real** na
+mesma rede Docker do teste, confirmando que o e-mail chega via API do Mailpit).
+
+`vendas-api`: `VendasApi.Domain.Tests` (unitário, `PlacaValidator` + `Veiculo`) e
+`VendasApi.Tests` (integração — Keycloak **e** Postgres reais e efêmeros, compartilhados por
+todas as classes de teste do projeto via `[Collection]`, para não subir um par de containers
+por classe; cobre validação de token — `/whoami`, `/whoami/cliente`, `/whoami/vendedor` —,
+cadastro (`POST /veiculos`), edição (`PUT /veiculos/{id}`), as duas listagens
+(`GET /veiculos`, pública; `GET /veiculos/vendidos`, restrita a `vendedor`) e exclusão/soft
+delete (`DELETE /veiculos/{id}`), incluindo consultas diretas ao Postgres do teste para
+confirmar que os dados persistidos batem com o que foi enviado, não só a resposta HTTP).
+
+`gateway` ainda só cobre o esqueleto (`GET /health`).
 
 ## Estrutura
 
@@ -199,12 +283,16 @@ revendaX/
 │   ├── IdentityApi.Application/     # casos de uso, comandos/resultados, portas
 │   ├── IdentityApi.Domain/          # regra de CPF, exceções de negócio (zero dependências)
 │   ├── IdentityApi.Infrastructure/  # implementação contra a Admin REST API do Keycloak
-│   └── VendasApi/
+│   ├── VendasApi/                   # host web — Controllers, Program.cs
+│   ├── VendasApi.Application/       # casos de uso, comandos/resultados, portas
+│   ├── VendasApi.Domain/            # entidade Veiculo, validação de placa, exceções (zero dependências)
+│   └── VendasApi.Infrastructure/    # EF Core + Npgsql, migrações
 ├── tests/
 │   ├── Gateway.Tests/
 │   ├── IdentityApi.Domain.Tests/    # unitário
 │   ├── IdentityApi.Tests/           # integração (Keycloak real via Testcontainers)
-│   └── VendasApi.Tests/
+│   ├── VendasApi.Domain.Tests/      # unitário
+│   └── VendasApi.Tests/             # integração (Keycloak + Postgres reais via Testcontainers)
 ├── infra/
 │   ├── docker-compose.yml
 │   └── keycloak/realm-clientes.json  # realm `clientes` exportado (US1.1)

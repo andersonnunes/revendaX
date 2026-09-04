@@ -54,6 +54,9 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - Keycloak__BaseUrl=http://keycloak:8080
+      # Credenciais de dev do próprio vendas-db definido abaixo — mesmo padrão já aceito para
+      # o admin do Keycloak e o client secret do identity-api (ambiente local efêmero).
+      - ConnectionStrings__VendasDb=Host=vendas-db;Port=5432;Database=vendas;Username=vendas;Password=vendas
     ports:
       - "5082:8080" # exposta à parte para debug direto; o acesso "oficial" é via gateway
     depends_on:
