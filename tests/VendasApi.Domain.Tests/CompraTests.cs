@@ -47,10 +47,33 @@ public class CompraTests
         Assert.Throws<CompraCanceladaException>(compra.ConfirmarPagamento);
     }
 
+    [Fact]
+    public void Cancelar_CompraPendente_TornaCancelada()
+    {
+        var compra = Compra.Iniciar(Guid.NewGuid(), "cliente-123", 89900.00m);
+
+        compra.Cancelar();
+
+        Assert.Equal(StatusCompra.Cancelada, compra.Status);
+    }
+
+    [Theory]
+    [InlineData(StatusCompra.Concluida)]
+    [InlineData(StatusCompra.Cancelada)]
+    public void Cancelar_CompraNaoPendente_NaoAlteraStatus(StatusCompra status)
+    {
+        var compra = Compra.Iniciar(Guid.NewGuid(), "cliente-123", 89900.00m);
+        AjustarStatus(compra, status);
+
+        compra.Cancelar(); // idempotente — não deve lançar nem alterar
+
+        Assert.Equal(status, compra.Status);
+    }
+
     /// <summary>
-    /// Não existe (ainda) nenhuma operação pública que leve uma compra a `Cancelada` — essa
-    /// transição só chega na US3.5. Reflexão é o jeito honesto de testar o guard clause de
-    /// `ConfirmarPagamento` sem esperar a US3.5 nem vazar um setter de teste na entidade.
+    /// Não existe (ainda) nenhuma operação pública que leve uma compra a `Cancelada`/`Concluida`
+    /// diretamente para fins deste teste — reflexão é o jeito honesto de testar os guard
+    /// clauses sem vazar um setter de teste na entidade.
     /// </summary>
     private static void AjustarStatus(Compra compra, StatusCompra status)
     {
