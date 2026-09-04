@@ -47,7 +47,7 @@
                     </div>
                     <span class="price">@veiculo.Preco.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))</span>
 
-                    <AuthorizeView Roles="cliente" Context="authContext">
+                    <AuthorizeView Policy="SomenteCliente" Context="authContext">
                         <Authorized>
                             @if (confirmandoId == veiculo.Id)
                             {
