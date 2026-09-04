@@ -26,8 +26,9 @@ planejamento da atividade acadêmica, não parte da entrega.
 > exclusão/soft delete (US2.5), `vendas-api` já com Clean Architecture e persistência própria
 > (EF Core + Postgres). **Épico 3 (Compras) em andamento** — início de compra (US3.1)
 > implementado (`POST /compras`, reserva o veículo e cria a compra `Pendente`); concorrência
-> entre compras simultâneas, efetivação (confirmação de pagamento), consulta de status e
-> expiração automática de reservas ainda não implementados. `gateway` ainda é só o esqueleto
+> entre compras simultâneas (US3.2, controle otimista via `xmin`) também implementada;
+> efetivação (confirmação de pagamento), consulta de status e expiração automática de reservas
+> ainda não implementados. `gateway` ainda é só o esqueleto
 > (build, testes, Docker, roteamento).
 
 ## Como rodar localmente
@@ -248,9 +249,30 @@ do veículo no momento da compra — mesmo que o vendedor edite o preço depois 
 `Vendido` → 409; `veiculoId` inexistente → 404; ausente/malformado → 400; sem token/role
 `cliente` → 401/403.
 
-Ainda não há tratamento para duas compras concorrentes disputando o mesmo veículo (segue no
-Épico 3), nem endpoint de efetivação/confirmação de pagamento — o veículo fica `Reservado`
-indefinidamente após esta etapa.
+Ainda não há endpoint de efetivação/confirmação de pagamento — o veículo fica `Reservado`
+indefinidamente após esta etapa (segue no Épico 3).
+
+## Concorrência na compra (US3.2)
+
+Duas requisições de compra simultâneas para o mesmo veículo nunca criam duas compras: a
+segunda recebe 409. Controle de concorrência otimista via `xmin` (coluna de sistema do
+Postgres) em `Veiculo` — qualquer escrita concorrente sobre o mesmo veículo (duas compras, ou
+uma edição correndo contra uma compra) é detectada e vira 409, não só o caminho comum de
+"veículo não está mais disponível":
+
+```bash
+# Duas chamadas reais e concorrentes para o mesmo veiculoId
+curl -X POST http://localhost:8080/vendas/compras \
+  -H "Authorization: Bearer $TOKEN_CLIENTE" -H "Content-Type: application/json" \
+  -d '{"veiculoId": "<id>"}' &
+curl -X POST http://localhost:8080/vendas/compras \
+  -H "Authorization: Bearer $TOKEN_CLIENTE" -H "Content-Type: application/json" \
+  -d '{"veiculoId": "<id>"}' &
+wait
+# uma responde 201, a outra 409 — { "message": "O veículo foi alterado por outra operação simultânea." }
+```
+
+Sem retentativa automática da requisição perdedora — cabe ao cliente tentar outro veículo.
 
 ## Testar a recuperação de senha (US1.4)
 
@@ -292,9 +314,10 @@ todas as classes de teste do projeto via `[Collection]`, para não subir um par 
 por classe; cobre validação de token — `/whoami`, `/whoami/cliente`, `/whoami/vendedor` —,
 cadastro (`POST /veiculos`), edição (`PUT /veiculos/{id}`), as duas listagens
 (`GET /veiculos`, pública; `GET /veiculos/vendidos`, restrita a `vendedor`), exclusão/soft
-delete (`DELETE /veiculos/{id}`) e início de compra (`POST /compras`), incluindo consultas
-diretas ao Postgres do teste para confirmar que os dados persistidos batem com o que foi
-enviado, não só a resposta HTTP).
+delete (`DELETE /veiculos/{id}`), início de compra (`POST /compras`) e concorrência entre
+compras simultâneas para o mesmo veículo (requisições HTTP concorrentes reais via
+`Task.WhenAll`), incluindo consultas diretas ao Postgres do teste para confirmar que os dados
+persistidos batem com o que foi enviado, não só a resposta HTTP).
 
 `gateway` ainda só cobre o esqueleto (`GET /health`).
 
