@@ -24,12 +24,12 @@ planejamento da atividade acadêmica, não parte da entrega.
 > (US1.5). **Épico 2 (Veículos) completo** — cadastro (US2.1), edição (US2.2), listagem
 > pública de veículos à venda (US2.3), listagem restrita de veículos vendidos (US2.4) e
 > exclusão/soft delete (US2.5), `vendas-api` já com Clean Architecture e persistência própria
-> (EF Core + Postgres). **Épico 3 (Compras) em andamento** — início de compra (US3.1)
-> implementado (`POST /compras`, reserva o veículo e cria a compra `Pendente`); concorrência
-> entre compras simultâneas (US3.2, controle otimista via `xmin`), efetivação da compra via
-> webhook de pagamento simulado (US3.3) e consulta de status pelo dono (US3.4, `GET
-> /compras/{id}`) também implementadas; expiração automática de reservas ainda não
-> implementada. `gateway` ainda é só o esqueleto (build, testes, Docker, roteamento).
+> (EF Core + Postgres). **Épico 3 (Compras) completo** — início de compra (US3.1, `POST
+> /compras`, reserva o veículo e cria a compra `Pendente`), concorrência entre compras
+> simultâneas (US3.2, controle otimista via `xmin`), efetivação da compra via webhook de
+> pagamento simulado (US3.3), consulta de status pelo dono (US3.4, `GET /compras/{id}`) e
+> expiração automática de reservas não pagas (US3.5, job em background). `gateway` ainda é só
+> o esqueleto (build, testes, Docker, roteamento).
 
 ## Como rodar localmente
 
@@ -305,6 +305,21 @@ curl http://localhost:8080/vendas/compras/{id} -H "Authorization: Bearer $TOKEN_
 `id` inexistente **ou** de uma compra de outro cliente → 404 (nunca 403 — não confirma pra um
 cliente que um id alheio existe). Sem token → 401; token sem role `cliente` → 403.
 
+## Expiração automática de reservas (US3.5)
+
+Uma compra `Pendente` que não é paga em 30 minutos (`Compras:TimeoutReservaMinutos`) é
+cancelada automaticamente e o veículo volta a `Disponivel` — sem gatilho HTTP, é um
+`BackgroundService` interno do `vendas-api` que varre o banco a cada minuto
+(`Compras:IntervaloVerificacaoMinutos`). Sobe junto com `docker compose up --build`, sem
+infraestrutura de agendamento externa. Ajustável via `appsettings.json`/variável de ambiente,
+sem mudança de código:
+
+```bash
+# Exemplo: reduzir o timeout pra 2 minutos, verificando a cada 1 minuto (útil pra demonstração)
+Compras__TimeoutReservaMinutos=2
+Compras__IntervaloVerificacaoMinutos=1
+```
+
 ## Testar a recuperação de senha (US1.4)
 
 `identity-api` só dispara o e-mail — a troca de senha acontece na página hospedada do
@@ -348,9 +363,11 @@ cadastro (`POST /veiculos`), edição (`PUT /veiculos/{id}`), as duas listagens
 delete (`DELETE /veiculos/{id}`), início de compra (`POST /compras`), concorrência entre
 compras simultâneas para o mesmo veículo (requisições HTTP concorrentes reais via
 `Task.WhenAll`), efetivação da compra via webhook simulado
-(`POST /compras/{id}/confirmar-pagamento`) e consulta de status pelo dono
-(`GET /compras/{id}`), incluindo consultas diretas ao Postgres do teste para confirmar que os
-dados persistidos batem com o que foi enviado, não só a resposta HTTP).
+(`POST /compras/{id}/confirmar-pagamento`), consulta de status pelo dono
+(`GET /compras/{id}`) e expiração automática de reservas
+(`ICancelarComprasExpiradasUseCase` chamado diretamente, sem esperar o `BackgroundService`/
+timer real), incluindo consultas diretas ao Postgres do teste para confirmar que os dados
+persistidos batem com o que foi enviado, não só a resposta HTTP).
 
 `gateway` ainda só cobre o esqueleto (`GET /health`).
 
