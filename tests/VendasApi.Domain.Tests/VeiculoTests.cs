@@ -181,6 +181,28 @@ public class VeiculoTests
         Assert.Throws<VeiculoIndisponivelParaCompraException>(veiculo.Reservar);
     }
 
+    [Fact]
+    public void MarcarComoVendido_VeiculoReservado_TornaVendido()
+    {
+        var veiculo = Veiculo.Cadastrar("Fiat", "Argo", 2024, "Branco", 89900.00m, "ABC1D23");
+        veiculo.Reservar();
+
+        veiculo.MarcarComoVendido();
+
+        Assert.Equal(StatusVeiculo.Vendido, veiculo.Status);
+    }
+
+    [Theory]
+    [InlineData(StatusVeiculo.Disponivel)]
+    [InlineData(StatusVeiculo.Vendido)]
+    public void MarcarComoVendido_VeiculoNaoReservado_LancaVeiculoNaoReservadoException(StatusVeiculo status)
+    {
+        var veiculo = Veiculo.Cadastrar("Fiat", "Argo", 2024, "Branco", 89900.00m, "ABC1D23");
+        AjustarStatus(veiculo, status);
+
+        Assert.Throws<VeiculoNaoReservadoException>(veiculo.MarcarComoVendido);
+    }
+
     /// <summary>
     /// Não existe (ainda) nenhuma operação pública que leve um veículo a `Vendido` fora do
     /// fluxo de compra — este teste isola o guard clause de `Excluir`/`Reservar` sem depender
