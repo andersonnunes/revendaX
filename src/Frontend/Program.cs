@@ -24,8 +24,11 @@ builder.Services.AddOidcAuthentication(options =>
 })
     .AddAccountClaimsPrincipalFactory<RealmRolesClaimsPrincipalFactory>();
 
-// HttpClient com o token anexado automaticamente nas chamadas pro gateway — as páginas
-// seguintes (US4.2+) só injetam este client, sem reimplementar anexação de Bearer.
+// Dois clients nomeados pro gateway, não um só — "Gateway" (com AuthorizationMessageHandler)
+// só serve chamadas de usuário autenticado (US4.4/US4.5). Descoberto na US4.2: o handler
+// lança AccessTokenNotAvailableException quando não há usuário logado (não segue sem token
+// silenciosamente) — inutilizável pra chamada anônima como o cadastro. "GatewayPublico" existe
+// exatamente pra isso: mesmo endereço, sem handler de autenticação nenhum.
 builder.Services.AddHttpClient("Gateway", client => client.BaseAddress = new Uri(gatewayBaseAddress))
     .AddHttpMessageHandler(sp =>
     {
@@ -33,6 +36,6 @@ builder.Services.AddHttpClient("Gateway", client => client.BaseAddress = new Uri
         handler.ConfigureHandler(authorizedUrls: [gatewayBaseAddress]);
         return handler;
     });
-builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("Gateway"));
+builder.Services.AddHttpClient("GatewayPublico", client => client.BaseAddress = new Uri(gatewayBaseAddress));
 
 await builder.Build().RunAsync();

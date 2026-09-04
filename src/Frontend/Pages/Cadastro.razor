@@ -1,11 +1,155 @@
 @page "/cadastro"
+@using IdentityApi.Domain.Validation
+@using System.Net
+@using System.Net.Http.Json
+@inject IHttpClientFactory HttpClientFactory
 
 <PageTitle>Cadastro — RevendaX</PageTitle>
 
 <main class="main-content">
     <a href="/" class="back-link">&larr; Voltar</a>
-    <div class="glass-card" style="max-width: 480px; margin: 0 auto;">
-        <h2>Cadastro de cliente</h2>
-        <p class="subtitle">Esta tela chega na US4.2 (Épico 4, Frontend bônus) — ainda não implementada.</p>
+
+    <div class="glass-card auth-card" style="max-width: 480px; margin: 0 auto;">
+        @if (concluido)
+        {
+            <h2>Conta criada!</h2>
+            <p class="subtitle">
+                Agora é só entrar com o e-mail e a senha que você acabou de cadastrar.
+            </p>
+            <a class="btn primary block" href="authentication/login">Ir para o login</a>
+        }
+        else
+        {
+            <h2>Cadastro de cliente</h2>
+            <p class="subtitle">Leva menos de um minuto.</p>
+
+            @if (erroGeral is not null)
+            {
+                <div class="toast error" style="margin-bottom: 18px; min-width: 0; width: 100%;">
+                    <span class="toast-message">@erroGeral</span>
+                </div>
+            }
+
+            <form @onsubmit="EnviarAsync" @onsubmit:preventDefault>
+                <div class="input-group">
+                    <label for="nome">Nome</label>
+                    <input id="nome" @bind="nome" @bind:event="oninput" disabled="@enviando" />
+                    <div class="field-error">@erroNome</div>
+                </div>
+
+                <div class="input-group">
+                    <label for="email">E-mail</label>
+                    <input id="email" type="email" @bind="email" @bind:event="oninput" disabled="@enviando" />
+                    <div class="field-error">@erroEmail</div>
+                </div>
+
+                <div class="input-group">
+                    <label for="cpf">CPF</label>
+                    <input id="cpf" @bind="cpf" @bind:event="oninput" placeholder="000.000.000-00" disabled="@enviando" />
+                    <div class="field-error">@erroCpf</div>
+                </div>
+
+                <div class="input-group">
+                    <label for="senha">Senha</label>
+                    <input id="senha" type="password" @bind="senha" @bind:event="oninput" disabled="@enviando" />
+                    <div class="field-error">@erroSenha</div>
+                </div>
+
+                <div class="input-group">
+                    <label for="telefone">Telefone (opcional)</label>
+                    <input id="telefone" @bind="telefone" @bind:event="oninput" disabled="@enviando" />
+                </div>
+
+                <button type="submit" class="btn primary block" disabled="@enviando">
+                    @(enviando ? "Enviando..." : "Cadastrar")
+                </button>
+            </form>
+
+            <p class="form-footer">Já tem conta? <a href="authentication/login">Entrar</a></p>
+        }
     </div>
 </main>
+
+@code {
+    private string nome = string.Empty;
+    private string email = string.Empty;
+    private string cpf = string.Empty;
+    private string senha = string.Empty;
+    private string? telefone;
+
+    private string? erroNome;
+    private string? erroEmail;
+    private string? erroCpf;
+    private string? erroSenha;
+    private string? erroGeral;
+
+    private bool enviando;
+    private bool concluido;
+
+    // "GatewayPublico" (sem AuthorizationMessageHandler) — cadastro acontece antes de existir
+    // qualquer sessão, e o client "Gateway" (autenticado) lança AccessTokenNotAvailableException
+    // quando não há usuário logado, em vez de só seguir sem token. Ver Program.cs.
+    private HttpClient Gateway => HttpClientFactory.CreateClient("GatewayPublico");
+
+    private bool Validar()
+    {
+        erroNome = string.IsNullOrWhiteSpace(nome) ? "Informe seu nome." : null;
+        erroEmail = string.IsNullOrWhiteSpace(email) || !email.Contains('@')
+            ? "Informe um e-mail válido."
+            : null;
+
+        // Mesma classe usada pelo identity-api (referência de projeto, não uma cópia) — se o
+        // backend aceitar, esta checagem também aceita, e vice-versa.
+        erroCpf = CpfValidator.IsValid(cpf) ? null : "CPF inválido.";
+
+        erroSenha = senha.Length < 8 ? "A senha deve ter ao menos 8 caracteres." : null;
+
+        return erroNome is null && erroEmail is null && erroCpf is null && erroSenha is null;
+    }
+
+    private async Task EnviarAsync()
+    {
+        erroGeral = null;
+        if (!Validar())
+        {
+            return;
+        }
+
+        enviando = true;
+        try
+        {
+            var resposta = await Gateway.PostAsJsonAsync("identity/clientes", new
+            {
+                nome,
+                email,
+                cpf,
+                senha,
+                telefone,
+            });
+
+            if (resposta.IsSuccessStatusCode)
+            {
+                concluido = true;
+                return;
+            }
+
+            erroGeral = resposta.StatusCode switch
+            {
+                HttpStatusCode.Conflict => "E-mail ou CPF já cadastrado.",
+                HttpStatusCode.UnprocessableEntity => "CPF inválido.",
+                HttpStatusCode.ServiceUnavailable =>
+                    "Serviço indisponível no momento — tente novamente em instantes.",
+                HttpStatusCode.BadRequest => "Dados inválidos — confira os campos e tente de novo.",
+                _ => "Não foi possível concluir o cadastro. Tente novamente.",
+            };
+        }
+        catch (HttpRequestException)
+        {
+            erroGeral = "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.";
+        }
+        finally
+        {
+            enviando = false;
+        }
+    }
+}

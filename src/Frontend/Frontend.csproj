@@ -14,4 +14,10 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- CpfValidator (US4.2) — classe de domínio pura, sem dependência server-only, segura de
+         referenciar direto do WebAssembly: mesma regra do backend, sem duplicar em C#/JS. -->
+    <ProjectReference Include="../IdentityApi.Domain/IdentityApi.Domain.csproj" />
+  </ItemGroup>
+
 </Project>
