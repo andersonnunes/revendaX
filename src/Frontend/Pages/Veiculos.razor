@@ -81,24 +81,6 @@
 </main>
 
 @code {
-    // Formato próprio do Frontend, não IdentityApi.Application.VeiculoResult via
-    // ProjectReference — decisão registrada na US4.3: VeiculoResult é só forma de dados (sem
-    // lógica que valha a pena não duplicar, diferente do CpfValidator da US4.2), e referenciar
-    // o assembly inteiro do VendasApi.Application acoplaria o frontend a tipos internos do
-    // backend (comandos/portas de outros casos de uso) sem necessidade nenhuma pra esta tela.
-    private sealed class VeiculoDto
-    {
-        public Guid Id { get; set; }
-        public string Marca { get; set; } = string.Empty;
-        public string Modelo { get; set; } = string.Empty;
-        public int Ano { get; set; }
-        public string Cor { get; set; } = string.Empty;
-        public decimal Preco { get; set; }
-        public string Placa { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty;
-        public DateTimeOffset CriadoEm { get; set; }
-    }
-
     private List<VeiculoDto>? veiculos;
     private string? erro;
     private string? erroCompra;

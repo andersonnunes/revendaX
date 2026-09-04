@@ -18,6 +18,8 @@
     <!-- CpfValidator (US4.2) — classe de domínio pura, sem dependência server-only, segura de
          referenciar direto do WebAssembly: mesma regra do backend, sem duplicar em C#/JS. -->
     <ProjectReference Include="../IdentityApi.Domain/IdentityApi.Domain.csproj" />
+    <!-- PlacaValidator (US4.5) — mesmo tratamento do CpfValidator acima. -->
+    <ProjectReference Include="../VendasApi.Domain/VendasApi.Domain.csproj" />
   </ItemGroup>
 
 </Project>

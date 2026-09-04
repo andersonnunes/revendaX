@@ -7,15 +7,17 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0.101 AS build
 WORKDIR /src
 
-# IdentityApi.Domain entra aqui só pelo CpfValidator (US4.2, referenciado via
-# <ProjectReference> em Frontend.csproj) — precisa estar no contexto de build por causa
-# disso, mesmo o Dockerfile sendo do Frontend, não do IdentityApi.
+# IdentityApi.Domain (CpfValidator, US4.2) e VendasApi.Domain (PlacaValidator, US4.5) entram
+# aqui só pelas duas <ProjectReference> em Frontend.csproj — precisam estar no contexto de
+# build por causa disso, mesmo o Dockerfile sendo do Frontend, não dos outros dois serviços.
 COPY ["src/Frontend/Frontend.csproj", "src/Frontend/"]
 COPY ["src/IdentityApi.Domain/IdentityApi.Domain.csproj", "src/IdentityApi.Domain/"]
+COPY ["src/VendasApi.Domain/VendasApi.Domain.csproj", "src/VendasApi.Domain/"]
 RUN dotnet restore "src/Frontend/Frontend.csproj"
 
 COPY src/Frontend/. src/Frontend/
 COPY src/IdentityApi.Domain/. src/IdentityApi.Domain/
+COPY src/VendasApi.Domain/. src/VendasApi.Domain/
 WORKDIR /src/src/Frontend
 RUN dotnet publish -c Release -o /app/publish --no-restore
 

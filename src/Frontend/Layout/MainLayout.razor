@@ -10,6 +10,11 @@
                     <a href="/minhas-compras" class="nav-link">Minhas Compras</a>
                 </Authorized>
             </AuthorizeView>
+            <AuthorizeView Roles="vendedor">
+                <Authorized>
+                    <a href="/painel-vendedor" class="nav-link">Painel do Vendedor</a>
+                </Authorized>
+            </AuthorizeView>
         </div>
         <LoginDisplay />
     </div>
