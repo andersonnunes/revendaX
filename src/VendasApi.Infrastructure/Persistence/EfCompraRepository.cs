@@ -14,12 +14,6 @@ public class EfCompraRepository(VendasDbContext dbContext) : ICompraRepository
             .Where(c => c.Status == StatusCompra.Pendente && c.CriadoEm < limite)
             .ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<Compra>> ListarPorClienteAsync(string clienteId, CancellationToken cancellationToken) =>
-        await dbContext.Compras
-            .Where(c => c.ClienteId == clienteId)
-            .OrderByDescending(c => c.CriadoEm)
-            .ToListAsync(cancellationToken);
-
     public async Task AdicionarAsync(Compra compra, CancellationToken cancellationToken)
     {
         dbContext.Compras.Add(compra);
