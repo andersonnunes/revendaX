@@ -4,8 +4,8 @@ namespace VendasApi.Application.Veiculos;
 
 /// <summary>
 /// Comando de entrada do caso de uso "editar veículo" — corpo de PUT /veiculos/{id}. Sem
-/// `Placa`/`Status`: são imutáveis por este endpoint (ver `Veiculo.AtualizarDados` e o
-/// refinamento da US2.2). `Ano`/`Preco` sem `[Required]` pelo mesmo motivo do
+/// `Placa`/`Status`: são imutáveis por este endpoint (ver `Veiculo.AtualizarDados`).
+/// `Ano`/`Preco` sem `[Required]` pelo mesmo motivo do
 /// `CadastrarVeiculoCommand` (US2.1) — a validação de intervalo/positividade é regra de
 /// negócio (422), não checagem de formato.
 /// </summary>

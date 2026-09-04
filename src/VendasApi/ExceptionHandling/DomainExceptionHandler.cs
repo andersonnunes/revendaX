@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 using VendasApi.Domain.Exceptions;
 
 namespace VendasApi.ExceptionHandling;
@@ -7,7 +8,11 @@ namespace VendasApi.ExceptionHandling;
 /// Mapeia exceções de negócio (VendasApi.Domain) para status HTTP, num único lugar — mesmo
 /// padrão do `identity-api` (ver `IdentityApi/ExceptionHandling/DomainExceptionHandler.cs`,
 /// que resolveu o mesmo problema de OCP: um `catch` por exceção em cada controller obrigaria
-/// editar todo controller a cada exceção nova).
+/// editar todo controller a cada exceção nova). Também mapeia
+/// <see cref="DbUpdateConcurrencyException"/> — não é uma exceção de `VendasApi.Domain`, mas
+/// protege qualquer escrita concorrente em `Veiculo` (edição, exclusão ou início de compra
+/// correndo ao mesmo tempo sobre o mesmo registro), então uma entrada só aqui cobre os quatro
+/// casos em vez de repetir a mesma tradução em cada caso de uso.
 /// </summary>
 public class DomainExceptionHandler : IExceptionHandler
 {
@@ -20,6 +25,11 @@ public class DomainExceptionHandler : IExceptionHandler
         [typeof(VeiculoVendidoException)] = (StatusCodes.Status409Conflict, "Veículo vendido não pode ser editado."),
         [typeof(VeiculoNaoEncontradoException)] = (StatusCodes.Status404NotFound, "Veículo não encontrado."),
         [typeof(VeiculoNaoPodeSerExcluidoException)] = (StatusCodes.Status409Conflict, "Só é possível excluir veículo disponível."),
+        [typeof(VeiculoIndisponivelParaCompraException)] = (StatusCodes.Status409Conflict, "Veículo não está disponível para compra."),
+        [typeof(DbUpdateConcurrencyException)] = (StatusCodes.Status409Conflict, "O veículo foi alterado por outra operação simultânea."),
+        [typeof(VeiculoNaoReservadoException)] = (StatusCodes.Status409Conflict, "Veículo não está reservado."),
+        [typeof(CompraNaoEncontradaException)] = (StatusCodes.Status404NotFound, "Compra não encontrada."),
+        [typeof(CompraCanceladaException)] = (StatusCodes.Status409Conflict, "Compra cancelada não pode ter o pagamento confirmado."),
     };
 
     public async ValueTask<bool> TryHandleAsync(

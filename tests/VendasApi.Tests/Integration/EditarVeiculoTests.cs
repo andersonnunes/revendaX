@@ -188,8 +188,8 @@ public class EditarVeiculoTests : IAsyncLifetime
 
     /// <summary>
     /// Não há (ainda) endpoint que leve um veículo a `Vendido` — essa transição só chega no
-    /// Épico 3. Ajusta o status direto no banco de teste, mesmo padrão já registrado nos
-    /// refinamentos das US2.3/US2.4 para `Reservado`/`Vendido`.
+    /// Épico 3. Ajusta o status direto no banco de teste, mesmo padrão usado em outras suítes
+    /// deste projeto para simular `Reservado`/`Vendido`.
     /// </summary>
     private async Task MarcarComoVendidoAsync(Guid id)
     {
@@ -214,5 +214,5 @@ public class EditarVeiculoTests : IAsyncLifetime
     }
 }
 
-/// <summary>Corpo de PUT /veiculos/{id} usado pelos testes — sem `placa`/`status`, de propósito (ver refinamento da US2.2).</summary>
+/// <summary>Corpo de PUT /veiculos/{id} usado pelos testes — sem `placa`/`status`, de propósito (imutáveis por este endpoint).</summary>
 public record EditarVeiculoRequestDto(string Marca, string Modelo, int Ano, string Cor, decimal Preco);

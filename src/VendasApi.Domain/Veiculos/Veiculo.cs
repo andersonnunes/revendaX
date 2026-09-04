@@ -65,8 +65,8 @@ public class Veiculo
 
     /// <summary>
     /// Atualiza marca/modelo/ano/cor/preço (US2.2) — `Placa` e `Status` são imutáveis por
-    /// este método de propósito (ver refinamento da US2.2: são identidade e ciclo de vida do
-    /// veículo, não "dados" no sentido desta operação). Bloqueia veículo `Vendido` — conflito
+    /// este método de propósito: são identidade e ciclo de vida do veículo, não "dados" no
+    /// sentido desta operação. Bloqueia veículo `Vendido` — conflito
     /// de estado (409), não erro de validação de entrada (422): por isso é checado antes da
     /// validação de ano/preço, não junto dela.
     /// </summary>
@@ -89,8 +89,8 @@ public class Veiculo
     /// <summary>
     /// Soft delete (US2.5) — só permitido em <see cref="StatusVeiculo.Disponivel"/> (mais
     /// restritivo que <see cref="AtualizarDados"/>, que só bloqueia `Vendido`: excluir tira o
-    /// veículo inteiramente de vista, o que poderia esconder uma reserva em andamento, ver
-    /// refinamento da US2.5). Idempotente por natureza — excluir não altera `Status`, então
+    /// veículo inteiramente de vista, o que poderia esconder uma reserva em andamento).
+    /// Idempotente por natureza — excluir não altera `Status`, então
     /// chamar de novo num veículo já excluído passa pelo mesmo guard clause e apenas reatribui
     /// `Ativo = false` a um campo que já é `false`, sem efeito colateral novo.
     /// </summary>
@@ -102,6 +102,57 @@ public class Veiculo
         }
 
         Ativo = false;
+    }
+
+    /// <summary>
+    /// Reserva o veículo para uma compra em andamento (US3.1) — só permitido a partir de
+    /// <see cref="StatusVeiculo.Disponivel"/>. Conflito de estado (409), mesmo racional de
+    /// <see cref="Excluir"/>: checar o estado é a defesa de primeira linha contra comprar um
+    /// veículo já reservado/vendido; a corrida entre duas leituras concorrentes (US3.2) é
+    /// fechada em `Infrastructure`, não aqui.
+    /// </summary>
+    public void Reservar()
+    {
+        if (Status != StatusVeiculo.Disponivel)
+        {
+            throw new VeiculoIndisponivelParaCompraException();
+        }
+
+        Status = StatusVeiculo.Reservado;
+    }
+
+    /// <summary>
+    /// Efetiva a venda (US3.3) — só permitido a partir de <see cref="StatusVeiculo.Reservado"/>.
+    /// Defesa em profundidade, não um caminho alcançável pelo fluxo normal: uma compra
+    /// `Pendente` sempre corresponde a um veículo `Reservado` (invariante garantida pela
+    /// gravação atômica das US3.1/US3.2), então este guard só dispararia com dado corrompido
+    /// em outro lugar.
+    /// </summary>
+    public void MarcarComoVendido()
+    {
+        if (Status != StatusVeiculo.Reservado)
+        {
+            throw new VeiculoNaoReservadoException();
+        }
+
+        Status = StatusVeiculo.Vendido;
+    }
+
+    /// <summary>
+    /// Libera a reserva de volta a <see cref="StatusVeiculo.Disponivel"/> (US3.5) — a compra
+    /// correspondente expirou sem pagamento. Só permitido a partir de
+    /// <see cref="StatusVeiculo.Reservado"/>: mesma defesa em profundidade de
+    /// <see cref="MarcarComoVendido"/>, reaproveitando a mesma exceção — as duas transições só
+    /// fazem sentido a partir do mesmo estado de origem.
+    /// </summary>
+    public void LiberarReserva()
+    {
+        if (Status != StatusVeiculo.Reservado)
+        {
+            throw new VeiculoNaoReservadoException();
+        }
+
+        Status = StatusVeiculo.Disponivel;
     }
 
     private static void ValidarAnoEPreco(int ano, decimal preco)

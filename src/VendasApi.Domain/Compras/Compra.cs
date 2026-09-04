@@ -1,0 +1,83 @@
+using VendasApi.Domain.Exceptions;
+
+namespace VendasApi.Domain.Compras;
+
+/// <summary>
+/// Agregado de compra — independente de <c>Veiculo</c> (só referencia <see cref="VeiculoId"/>,
+/// sem navegação de volta), com ciclo de vida e dono (<see cref="ClienteId"/>) próprios. Gera o
+/// próprio `Id`/`CriadoEm`, mesmo racional já usado em `Veiculo`.
+/// </summary>
+public class Compra
+{
+    public Guid Id { get; private set; }
+    public Guid VeiculoId { get; private set; }
+
+    /// <summary>`sub` do token do Keycloak — nenhuma tabela de cliente em `vendas-api` (mesma decisão do Épico 1).</summary>
+    public string ClienteId { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Snapshot de <c>Veiculo.Preco</c> no momento da compra, imutável dali em diante — um
+    /// veículo `Reservado` continua editável (US2.2), então o preço do veículo pode mudar
+    /// enquanto esta compra segue `Pendente`; a compra não deve refletir essa mudança.
+    /// </summary>
+    public decimal Preco { get; private set; }
+
+    public StatusCompra Status { get; private set; }
+    public DateTimeOffset CriadoEm { get; private set; }
+
+    private Compra()
+    {
+        // Construtor exigido pelo EF Core para materializar entidades via reflexão.
+    }
+
+    /// <summary>
+    /// Inicia uma compra `Pendente` (US3.1). Sem validação de formato aqui — `veiculoId`
+    /// (existência) e `clienteId` (vem de um token já validado, nunca do corpo da requisição)
+    /// já são responsabilidade de camadas anteriores (`IniciarCompraUseCase`), não deste
+    /// agregado.
+    /// </summary>
+    public static Compra Iniciar(Guid veiculoId, string clienteId, decimal preco) => new()
+    {
+        Id = Guid.NewGuid(),
+        VeiculoId = veiculoId,
+        ClienteId = clienteId,
+        Preco = preco,
+        Status = StatusCompra.Pendente,
+        CriadoEm = DateTimeOffset.UtcNow,
+    };
+
+    /// <summary>
+    /// Confirma o pagamento (US3.3) — só permitido a partir de <see cref="StatusCompra.Pendente"/>.
+    /// Idempotência (reentrega de webhook numa compra já <see cref="StatusCompra.Concluida"/>)
+    /// não é responsabilidade deste método — é cortada antes, no caso de uso, que nem chega a
+    /// chamar isto para uma compra já concluída. O guard aqui só protege o caso restante:
+    /// compra `Cancelada`, um conflito de fato, não um retry legítimo.
+    /// </summary>
+    public void ConfirmarPagamento()
+    {
+        if (Status != StatusCompra.Pendente)
+        {
+            throw new CompraCanceladaException();
+        }
+
+        Status = StatusCompra.Concluida;
+    }
+
+    /// <summary>
+    /// Cancela a compra por falta de pagamento dentro do prazo (US3.5) — só tem efeito a
+    /// partir de <see cref="StatusCompra.Pendente"/>; chamar sobre uma compra que já não está
+    /// mais `Pendente` (`Concluida` ou já `Cancelada`) não faz nada. Sem exceção pública, ao
+    /// contrário de <see cref="ConfirmarPagamento"/>: usado só internamente pelo job de
+    /// expiração, que já filtra por `Pendente` antes de chamar isto — idempotente por
+    /// construção, não precisa de guard que lance erro.
+    /// </summary>
+    public void Cancelar()
+    {
+        if (Status != StatusCompra.Pendente)
+        {
+            return;
+        }
+
+        Status = StatusCompra.Cancelada;
+    }
+}

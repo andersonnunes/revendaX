@@ -7,7 +7,7 @@ namespace VendasApi.Application.Ports;
 /// — EF Core/Postgres, ver `docs/architecture.md`). Uma porta por agregado, não por caso de
 /// uso — é o uso pretendido do padrão Repository, diferente do caso do `identity-api`
 /// (`IIdentityProvider` foi dividido porque agrupava dois conceitos de negócio diferentes,
-/// não porque repositório-por-agregado esteja errado; ver US2.2/refinamentos).
+/// não porque repositório-por-agregado esteja errado).
 /// </summary>
 public interface IVeiculoRepository
 {
@@ -22,7 +22,7 @@ public interface IVeiculoRepository
     /// <summary>
     /// Filtra por status e ordena por preço ascendente (desempate por `CriadoEm` ascendente)
     /// — parametrizado por status, não um método fixo tipo `ListarDisponiveisAsync`, porque a
-    /// US2.4 precisa exatamente da mesma operação para `Vendido` (ver refinamento da US2.3).
+    /// US2.4 precisa exatamente da mesma operação para `Vendido`.
     /// </summary>
     Task<IReadOnlyList<Veiculo>> ListarPorStatusOrdenadosPorPrecoAsync(StatusVeiculo status, CancellationToken cancellationToken);
 }

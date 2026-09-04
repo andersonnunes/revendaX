@@ -160,11 +160,76 @@ public class VeiculoTests
         Assert.True(veiculo.Ativo);
     }
 
+    [Fact]
+    public void Reservar_VeiculoDisponivel_TornaReservado()
+    {
+        var veiculo = Veiculo.Cadastrar("Fiat", "Argo", 2024, "Branco", 89900.00m, "ABC1D23");
+
+        veiculo.Reservar();
+
+        Assert.Equal(StatusVeiculo.Reservado, veiculo.Status);
+    }
+
+    [Theory]
+    [InlineData(StatusVeiculo.Reservado)]
+    [InlineData(StatusVeiculo.Vendido)]
+    public void Reservar_VeiculoNaoDisponivel_LancaVeiculoIndisponivelParaCompraException(StatusVeiculo status)
+    {
+        var veiculo = Veiculo.Cadastrar("Fiat", "Argo", 2024, "Branco", 89900.00m, "ABC1D23");
+        AjustarStatus(veiculo, status);
+
+        Assert.Throws<VeiculoIndisponivelParaCompraException>(veiculo.Reservar);
+    }
+
+    [Fact]
+    public void MarcarComoVendido_VeiculoReservado_TornaVendido()
+    {
+        var veiculo = Veiculo.Cadastrar("Fiat", "Argo", 2024, "Branco", 89900.00m, "ABC1D23");
+        veiculo.Reservar();
+
+        veiculo.MarcarComoVendido();
+
+        Assert.Equal(StatusVeiculo.Vendido, veiculo.Status);
+    }
+
+    [Theory]
+    [InlineData(StatusVeiculo.Disponivel)]
+    [InlineData(StatusVeiculo.Vendido)]
+    public void MarcarComoVendido_VeiculoNaoReservado_LancaVeiculoNaoReservadoException(StatusVeiculo status)
+    {
+        var veiculo = Veiculo.Cadastrar("Fiat", "Argo", 2024, "Branco", 89900.00m, "ABC1D23");
+        AjustarStatus(veiculo, status);
+
+        Assert.Throws<VeiculoNaoReservadoException>(veiculo.MarcarComoVendido);
+    }
+
+    [Fact]
+    public void LiberarReserva_VeiculoReservado_TornaDisponivel()
+    {
+        var veiculo = Veiculo.Cadastrar("Fiat", "Argo", 2024, "Branco", 89900.00m, "ABC1D23");
+        veiculo.Reservar();
+
+        veiculo.LiberarReserva();
+
+        Assert.Equal(StatusVeiculo.Disponivel, veiculo.Status);
+    }
+
+    [Theory]
+    [InlineData(StatusVeiculo.Disponivel)]
+    [InlineData(StatusVeiculo.Vendido)]
+    public void LiberarReserva_VeiculoNaoReservado_LancaVeiculoNaoReservadoException(StatusVeiculo status)
+    {
+        var veiculo = Veiculo.Cadastrar("Fiat", "Argo", 2024, "Branco", 89900.00m, "ABC1D23");
+        AjustarStatus(veiculo, status);
+
+        Assert.Throws<VeiculoNaoReservadoException>(veiculo.LiberarReserva);
+    }
+
     /// <summary>
-    /// Não existe (ainda) nenhuma operação pública que leve um veículo a `Reservado`/`Vendido`
-    /// — essa transição só chega no Épico 3. Reflexão é o jeito honesto de testar os guard
-    /// clauses de `AtualizarDados`/`Excluir` sem esperar o Épico 3 nem vazar um setter de
-    /// teste na entidade.
+    /// Não existe (ainda) nenhuma operação pública que leve um veículo a `Vendido` fora do
+    /// fluxo de compra — este teste isola o guard clause de `Excluir`/`Reservar` sem depender
+    /// do fluxo completo de compra. Reflexão é o jeito honesto de testar isso sem vazar um
+    /// setter de teste na entidade.
     /// </summary>
     private static void AjustarStatus(Veiculo veiculo, StatusVeiculo status)
     {

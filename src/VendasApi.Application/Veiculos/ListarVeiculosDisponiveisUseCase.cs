@@ -5,8 +5,8 @@ namespace VendasApi.Application.Veiculos;
 
 /// <summary>
 /// Sem regra de negócio própria além de delegar — filtro e ordenação são resolvidos na query
-/// (Infrastructure), não aqui (ver refinamento da US2.3: não é uma invariante do agregado,
-/// é uma projeção de leitura). Mesmo tão fino quanto o `RecuperarSenhaUseCase` do Épico 1.
+/// (Infrastructure), não aqui: não é uma invariante do agregado, é uma projeção de leitura.
+/// Mesmo tão fino quanto o `RecuperarSenhaUseCase` do Épico 1.
 /// </summary>
 public class ListarVeiculosDisponiveisUseCase(IVeiculoRepository veiculoRepository) : IListarVeiculosDisponiveisUseCase
 {

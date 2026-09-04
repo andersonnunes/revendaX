@@ -15,7 +15,7 @@ planejamento da atividade acadêmica, não parte da entrega.
 | `gateway` | Porta única de entrada (YARP) — roteia `/identity/**` e `/vendas/**` | `8080` |
 | `identity-api` | Cadastro de clientes — única credencial com permissão de escrita no Keycloak | `5081` (debug direto) |
 | `vendas-api` | Catálogo de veículos e compras (Postgres próprio, `vendas-db`) | `5082` (debug direto) |
-| Keycloak | Identity Provider (realm `clientes`, ainda não configurado — ver status abaixo) | `8081` |
+| Keycloak | Identity Provider (realm `clientes`, importado automaticamente do export commitado) | `8081` |
 | Mailpit | SMTP fake de dev (US1.4) — captura os e-mails de redefinição de senha | `8025` (UI/API) |
 
 > **Status atual**: Épico 1 (Identidade) completo — cadastro (US1.1), login direto no Keycloak
@@ -24,8 +24,12 @@ planejamento da atividade acadêmica, não parte da entrega.
 > (US1.5). **Épico 2 (Veículos) completo** — cadastro (US2.1), edição (US2.2), listagem
 > pública de veículos à venda (US2.3), listagem restrita de veículos vendidos (US2.4) e
 > exclusão/soft delete (US2.5), `vendas-api` já com Clean Architecture e persistência própria
-> (EF Core + Postgres). `gateway` ainda é só o esqueleto (build, testes, Docker, roteamento);
-> Épico 3 (compras) ainda não implementado.
+> (EF Core + Postgres). **Épico 3 (Compras) completo** — início de compra (US3.1, `POST
+> /compras`, reserva o veículo e cria a compra `Pendente`), concorrência entre compras
+> simultâneas (US3.2, controle otimista via `xmin`), efetivação da compra via webhook de
+> pagamento simulado (US3.3), consulta de status pelo dono (US3.4, `GET /compras/{id}`) e
+> expiração automática de reservas não pagas (US3.5, job em background). `gateway` ainda é só
+> o esqueleto (build, testes, Docker, roteamento).
 
 ## Como rodar localmente
 
@@ -226,6 +230,96 @@ curl -X DELETE http://localhost:8080/vendas/veiculos/{id} -H "Authorization: Bea
 Veículo `Reservado`/`Vendido` → 409; `id` inexistente → 404; sem token/role `vendedor` →
 401/403.
 
+## Testar a compra de veículo (US3.1)
+
+`POST /compras` — restrito à role `cliente`. Reserva o veículo (`Disponivel → Reservado`) e
+cria a compra `Pendente` atomicamente (a mesma transação garante que as duas escritas
+acontecem juntas, ou nenhuma delas):
+
+```bash
+curl -X POST http://localhost:8080/vendas/compras \
+  -H "Authorization: Bearer $TOKEN_CLIENTE" -H "Content-Type: application/json" \
+  -d '{"veiculoId": "<id de um veículo Disponivel>"}'
+# 201 Created — { "id": "...", "veiculoId": "...", "clienteId": "...", "preco": 89900.00, "status": "Pendente", "criadoEm": "..." }
+```
+
+`clienteId` vem do `sub` do token, nunca do corpo da requisição. `preco` é um retrato do preço
+do veículo no momento da compra — mesmo que o vendedor edite o preço depois (veículo
+`Reservado` continua editável, US2.2), a compra já criada não muda. Veículo `Reservado`/
+`Vendido` → 409; `veiculoId` inexistente → 404; ausente/malformado → 400; sem token/role
+`cliente` → 401/403.
+
+Ainda não há endpoint de efetivação/confirmação de pagamento — o veículo fica `Reservado`
+indefinidamente após esta etapa (segue no Épico 3).
+
+## Concorrência na compra (US3.2)
+
+Duas requisições de compra simultâneas para o mesmo veículo nunca criam duas compras: a
+segunda recebe 409. Controle de concorrência otimista via `xmin` (coluna de sistema do
+Postgres) em `Veiculo` — qualquer escrita concorrente sobre o mesmo veículo (duas compras, ou
+uma edição correndo contra uma compra) é detectada e vira 409, não só o caminho comum de
+"veículo não está mais disponível":
+
+```bash
+# Duas chamadas reais e concorrentes para o mesmo veiculoId
+curl -X POST http://localhost:8080/vendas/compras \
+  -H "Authorization: Bearer $TOKEN_CLIENTE" -H "Content-Type: application/json" \
+  -d '{"veiculoId": "<id>"}' &
+curl -X POST http://localhost:8080/vendas/compras \
+  -H "Authorization: Bearer $TOKEN_CLIENTE" -H "Content-Type: application/json" \
+  -d '{"veiculoId": "<id>"}' &
+wait
+# uma responde 201, a outra 409 — { "message": "O veículo foi alterado por outra operação simultânea." }
+```
+
+Sem retentativa automática da requisição perdedora — cabe ao cliente tentar outro veículo.
+
+## Testar a efetivação da compra (confirmação de pagamento, US3.3)
+
+`POST /compras/{id}/confirmar-pagamento` simula o callback de um gateway de pagamento — não
+tem `[Authorize]` de usuário (não há cliente/vendedor logado nesse fluxo), é protegido por um
+segredo compartilhado no header `X-Webhook-Secret` (`dev-webhook-secret` no
+`docker-compose.yml`, valor de desenvolvimento). Confirma o pagamento, muda a compra para
+`Concluida` e o veículo para `Vendido`:
+
+```bash
+curl -X POST http://localhost:8080/vendas/compras/{id}/confirmar-pagamento \
+  -H "X-Webhook-Secret: dev-webhook-secret"
+# 200 — { "id": "...", "status": "Concluida", ... }
+```
+
+Idempotente: confirmar de novo uma compra já `Concluida` (reentrega do webhook) retorna 200 de
+novo, sem erro e sem mudar nada. Compra `Cancelada` → 409; `id` inexistente → 404; header
+ausente/incorreto → 401. Depois da confirmação, o veículo aparece em `GET /veiculos/vendidos`
+(US2.4) e some de `GET /veiculos` (US2.3).
+
+## Testar a consulta de status da compra (US3.4)
+
+`GET /compras/{id}` — restrito à role `cliente` **e** ao dono da compra:
+
+```bash
+curl http://localhost:8080/vendas/compras/{id} -H "Authorization: Bearer $TOKEN_CLIENTE"
+# 200 — { "id": "...", "status": "Pendente" | "Concluida" | "Cancelada", ... }
+```
+
+`id` inexistente **ou** de uma compra de outro cliente → 404 (nunca 403 — não confirma pra um
+cliente que um id alheio existe). Sem token → 401; token sem role `cliente` → 403.
+
+## Expiração automática de reservas (US3.5)
+
+Uma compra `Pendente` que não é paga em 30 minutos (`Compras:TimeoutReservaMinutos`) é
+cancelada automaticamente e o veículo volta a `Disponivel` — sem gatilho HTTP, é um
+`BackgroundService` interno do `vendas-api` que varre o banco a cada minuto
+(`Compras:IntervaloVerificacaoMinutos`). Sobe junto com `docker compose up --build`, sem
+infraestrutura de agendamento externa. Ajustável via `appsettings.json`/variável de ambiente,
+sem mudança de código:
+
+```bash
+# Exemplo: reduzir o timeout pra 2 minutos, verificando a cada 1 minuto (útil pra demonstração)
+Compras__TimeoutReservaMinutos=2
+Compras__IntervaloVerificacaoMinutos=1
+```
+
 ## Testar a recuperação de senha (US1.4)
 
 `identity-api` só dispara o e-mail — a troca de senha acontece na página hospedada do
@@ -260,14 +354,20 @@ via **Testcontainers** — nunca mock de banco, identity provider ou fila.
 cadastro, login e recuperação de senha, esta última também contra um **Mailpit real** na
 mesma rede Docker do teste, confirmando que o e-mail chega via API do Mailpit).
 
-`vendas-api`: `VendasApi.Domain.Tests` (unitário, `PlacaValidator` + `Veiculo`) e
+`vendas-api`: `VendasApi.Domain.Tests` (unitário, `PlacaValidator` + `Veiculo` + `Compra`) e
 `VendasApi.Tests` (integração — Keycloak **e** Postgres reais e efêmeros, compartilhados por
 todas as classes de teste do projeto via `[Collection]`, para não subir um par de containers
 por classe; cobre validação de token — `/whoami`, `/whoami/cliente`, `/whoami/vendedor` —,
 cadastro (`POST /veiculos`), edição (`PUT /veiculos/{id}`), as duas listagens
-(`GET /veiculos`, pública; `GET /veiculos/vendidos`, restrita a `vendedor`) e exclusão/soft
-delete (`DELETE /veiculos/{id}`), incluindo consultas diretas ao Postgres do teste para
-confirmar que os dados persistidos batem com o que foi enviado, não só a resposta HTTP).
+(`GET /veiculos`, pública; `GET /veiculos/vendidos`, restrita a `vendedor`), exclusão/soft
+delete (`DELETE /veiculos/{id}`), início de compra (`POST /compras`), concorrência entre
+compras simultâneas para o mesmo veículo (requisições HTTP concorrentes reais via
+`Task.WhenAll`), efetivação da compra via webhook simulado
+(`POST /compras/{id}/confirmar-pagamento`), consulta de status pelo dono
+(`GET /compras/{id}`) e expiração automática de reservas
+(`ICancelarComprasExpiradasUseCase` chamado diretamente, sem esperar o `BackgroundService`/
+timer real), incluindo consultas diretas ao Postgres do teste para confirmar que os dados
+persistidos batem com o que foi enviado, não só a resposta HTTP).
 
 `gateway` ainda só cobre o esqueleto (`GET /health`).
 
@@ -285,8 +385,8 @@ revendaX/
 │   ├── IdentityApi.Infrastructure/  # implementação contra a Admin REST API do Keycloak
 │   ├── VendasApi/                   # host web — Controllers, Program.cs
 │   ├── VendasApi.Application/       # casos de uso, comandos/resultados, portas
-│   ├── VendasApi.Domain/            # entidade Veiculo, validação de placa, exceções (zero dependências)
-│   └── VendasApi.Infrastructure/    # EF Core + Npgsql, migrações
+│   ├── VendasApi.Domain/            # entidades Veiculo/Compra, validação de placa, exceções (zero dependências)
+│   └── VendasApi.Infrastructure/    # EF Core + Npgsql, migrações, unidade de trabalho
 ├── tests/
 │   ├── Gateway.Tests/
 │   ├── IdentityApi.Domain.Tests/    # unitário
