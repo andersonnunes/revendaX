@@ -312,6 +312,14 @@ curl http://localhost:8080/vendas/compras/{id} -H "Authorization: Bearer $TOKEN_
 `id` inexistente **ou** de uma compra de outro cliente → 404 (nunca 403 — não confirma pra um
 cliente que um id alheio existe). Sem token → 401; token sem role `cliente` → 403.
 
+`GET /compras` (sem id) lista **todas** as compras do cliente autenticado, qualquer status,
+mais recente primeiro — `clienteId` vem só do `sub` do token, nunca de parâmetro de rota/query:
+
+```bash
+curl http://localhost:8080/vendas/compras -H "Authorization: Bearer $TOKEN_CLIENTE"
+# 200 — [ { "id": "...", "status": "...", ... }, ... ] (lista vazia se o cliente não tiver nenhuma)
+```
+
 ## Expiração automática de reservas (US3.5)
 
 Uma compra `Pendente` que não é paga em 30 minutos (`Compras:TimeoutReservaMinutos`) é
