@@ -55,6 +55,49 @@ a { color: var(--accent); }
 
 .hidden { display: none !important; }
 
+/*
+ * `.loading-progress`/`.loading-progress-text` também não vêm do projeto de origem — são o
+ * indicador de carregamento padrão do template Blazor WebAssembly (`wwwroot/index.html`), sem
+ * nenhum estilo próprio do CSS reaproveitado. Sem isso, é um círculo SVG sem estilo (traço
+ * preto fino, canto superior esquerdo) sobre o fundo escuro do app — quase invisível, dá a
+ * impressão de tela quebrada/em branco enquanto o WebAssembly carrega, não de "carregando".
+ * `--blazor-load-percentage`/`--blazor-load-percentage-text` são setadas via JS pelo próprio
+ * runtime (`documentElement.style`), refletindo o progresso real do download dos assemblies.
+ */
+.loading-progress {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, calc(-50% - 24px));
+  width: 6rem;
+  height: 6rem;
+}
+.loading-progress circle {
+  fill: none;
+  stroke: var(--border-color);
+  stroke-width: 0.5rem;
+  transform-origin: 50% 50%;
+  transform: rotate(-90deg);
+}
+.loading-progress circle:last-child {
+  stroke: var(--primary);
+  stroke-dasharray: calc(3.141 * 6rem * var(--blazor-load-percentage, 0%) / 100%) calc(3.141 * 6rem);
+  transition: stroke-dasharray 0.1s ease-in-out;
+}
+.loading-progress-text {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, calc(-50% + 48px));
+  font-family: var(--font-header);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.loading-progress-text::after {
+  content: var(--blazor-load-percentage-text, "Carregando");
+}
+
 .glass-card {
   background: var(--bg-card);
   backdrop-filter: blur(16px) saturate(180%);
