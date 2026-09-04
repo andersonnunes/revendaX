@@ -24,8 +24,11 @@ planejamento da atividade acadêmica, não parte da entrega.
 > (US1.5). **Épico 2 (Veículos) completo** — cadastro (US2.1), edição (US2.2), listagem
 > pública de veículos à venda (US2.3), listagem restrita de veículos vendidos (US2.4) e
 > exclusão/soft delete (US2.5), `vendas-api` já com Clean Architecture e persistência própria
-> (EF Core + Postgres). `gateway` ainda é só o esqueleto (build, testes, Docker, roteamento);
-> Épico 3 (compras) ainda não implementado.
+> (EF Core + Postgres). **Épico 3 (Compras) em andamento** — início de compra (US3.1)
+> implementado (`POST /compras`, reserva o veículo e cria a compra `Pendente`); concorrência
+> entre compras simultâneas, efetivação (confirmação de pagamento), consulta de status e
+> expiração automática de reservas ainda não implementados. `gateway` ainda é só o esqueleto
+> (build, testes, Docker, roteamento).
 
 ## Como rodar localmente
 
@@ -226,6 +229,29 @@ curl -X DELETE http://localhost:8080/vendas/veiculos/{id} -H "Authorization: Bea
 Veículo `Reservado`/`Vendido` → 409; `id` inexistente → 404; sem token/role `vendedor` →
 401/403.
 
+## Testar a compra de veículo (US3.1)
+
+`POST /compras` — restrito à role `cliente`. Reserva o veículo (`Disponivel → Reservado`) e
+cria a compra `Pendente` atomicamente (a mesma transação garante que as duas escritas
+acontecem juntas, ou nenhuma delas):
+
+```bash
+curl -X POST http://localhost:8080/vendas/compras \
+  -H "Authorization: Bearer $TOKEN_CLIENTE" -H "Content-Type: application/json" \
+  -d '{"veiculoId": "<id de um veículo Disponivel>"}'
+# 201 Created — { "id": "...", "veiculoId": "...", "clienteId": "...", "preco": 89900.00, "status": "Pendente", "criadoEm": "..." }
+```
+
+`clienteId` vem do `sub` do token, nunca do corpo da requisição. `preco` é um retrato do preço
+do veículo no momento da compra — mesmo que o vendedor edite o preço depois (veículo
+`Reservado` continua editável, US2.2), a compra já criada não muda. Veículo `Reservado`/
+`Vendido` → 409; `veiculoId` inexistente → 404; ausente/malformado → 400; sem token/role
+`cliente` → 401/403.
+
+Ainda não há tratamento para duas compras concorrentes disputando o mesmo veículo (segue no
+Épico 3), nem endpoint de efetivação/confirmação de pagamento — o veículo fica `Reservado`
+indefinidamente após esta etapa.
+
 ## Testar a recuperação de senha (US1.4)
 
 `identity-api` só dispara o e-mail — a troca de senha acontece na página hospedada do
@@ -260,14 +286,15 @@ via **Testcontainers** — nunca mock de banco, identity provider ou fila.
 cadastro, login e recuperação de senha, esta última também contra um **Mailpit real** na
 mesma rede Docker do teste, confirmando que o e-mail chega via API do Mailpit).
 
-`vendas-api`: `VendasApi.Domain.Tests` (unitário, `PlacaValidator` + `Veiculo`) e
+`vendas-api`: `VendasApi.Domain.Tests` (unitário, `PlacaValidator` + `Veiculo` + `Compra`) e
 `VendasApi.Tests` (integração — Keycloak **e** Postgres reais e efêmeros, compartilhados por
 todas as classes de teste do projeto via `[Collection]`, para não subir um par de containers
 por classe; cobre validação de token — `/whoami`, `/whoami/cliente`, `/whoami/vendedor` —,
 cadastro (`POST /veiculos`), edição (`PUT /veiculos/{id}`), as duas listagens
-(`GET /veiculos`, pública; `GET /veiculos/vendidos`, restrita a `vendedor`) e exclusão/soft
-delete (`DELETE /veiculos/{id}`), incluindo consultas diretas ao Postgres do teste para
-confirmar que os dados persistidos batem com o que foi enviado, não só a resposta HTTP).
+(`GET /veiculos`, pública; `GET /veiculos/vendidos`, restrita a `vendedor`), exclusão/soft
+delete (`DELETE /veiculos/{id}`) e início de compra (`POST /compras`), incluindo consultas
+diretas ao Postgres do teste para confirmar que os dados persistidos batem com o que foi
+enviado, não só a resposta HTTP).
 
 `gateway` ainda só cobre o esqueleto (`GET /health`).
 
@@ -285,8 +312,8 @@ revendaX/
 │   ├── IdentityApi.Infrastructure/  # implementação contra a Admin REST API do Keycloak
 │   ├── VendasApi/                   # host web — Controllers, Program.cs
 │   ├── VendasApi.Application/       # casos de uso, comandos/resultados, portas
-│   ├── VendasApi.Domain/            # entidade Veiculo, validação de placa, exceções (zero dependências)
-│   └── VendasApi.Infrastructure/    # EF Core + Npgsql, migrações
+│   ├── VendasApi.Domain/            # entidades Veiculo/Compra, validação de placa, exceções (zero dependências)
+│   └── VendasApi.Infrastructure/    # EF Core + Npgsql, migrações, unidade de trabalho
 ├── tests/
 │   ├── Gateway.Tests/
 │   ├── IdentityApi.Domain.Tests/    # unitário
