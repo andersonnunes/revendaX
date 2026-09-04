@@ -20,6 +20,7 @@ public class DomainExceptionHandler : IExceptionHandler
         [typeof(VeiculoVendidoException)] = (StatusCodes.Status409Conflict, "Veículo vendido não pode ser editado."),
         [typeof(VeiculoNaoEncontradoException)] = (StatusCodes.Status404NotFound, "Veículo não encontrado."),
         [typeof(VeiculoNaoPodeSerExcluidoException)] = (StatusCodes.Status409Conflict, "Só é possível excluir veículo disponível."),
+        [typeof(VeiculoIndisponivelParaCompraException)] = (StatusCodes.Status409Conflict, "Veículo não está disponível para compra."),
     };
 
     public async ValueTask<bool> TryHandleAsync(
