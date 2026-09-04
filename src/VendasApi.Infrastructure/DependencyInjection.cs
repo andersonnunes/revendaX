@@ -22,6 +22,8 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IVeiculoRepository, EfVeiculoRepository>();
+        services.AddScoped<ICompraRepository, EfCompraRepository>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         return services;
     }
