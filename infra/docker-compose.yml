@@ -57,6 +57,9 @@ services:
       # Credenciais de dev do próprio vendas-db definido abaixo — mesmo padrão já aceito para
       # o admin do Keycloak e o client secret do identity-api (ambiente local efêmero).
       - ConnectionStrings__VendasDb=Host=vendas-db;Port=5432;Database=vendas;Username=vendas;Password=vendas
+      # Segredo de dev do webhook de confirmação de pagamento (US3.3) — mesmo padrão dos demais
+      # segredos de ambiente local efêmero acima.
+      - Pagamentos__WebhookSecret=dev-webhook-secret
     ports:
       - "5082:8080" # exposta à parte para debug direto; o acesso "oficial" é via gateway
     depends_on:

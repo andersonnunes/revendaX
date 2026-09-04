@@ -27,6 +27,9 @@ public class DomainExceptionHandler : IExceptionHandler
         [typeof(VeiculoNaoPodeSerExcluidoException)] = (StatusCodes.Status409Conflict, "Só é possível excluir veículo disponível."),
         [typeof(VeiculoIndisponivelParaCompraException)] = (StatusCodes.Status409Conflict, "Veículo não está disponível para compra."),
         [typeof(DbUpdateConcurrencyException)] = (StatusCodes.Status409Conflict, "O veículo foi alterado por outra operação simultânea."),
+        [typeof(VeiculoNaoReservadoException)] = (StatusCodes.Status409Conflict, "Veículo não está reservado."),
+        [typeof(CompraNaoEncontradaException)] = (StatusCodes.Status404NotFound, "Compra não encontrada."),
+        [typeof(CompraCanceladaException)] = (StatusCodes.Status409Conflict, "Compra cancelada não pode ter o pagamento confirmado."),
     };
 
     public async ValueTask<bool> TryHandleAsync(
