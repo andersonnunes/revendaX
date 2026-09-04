@@ -24,6 +24,15 @@ builder.Services.AddOidcAuthentication(options =>
 })
     .AddAccountClaimsPrincipalFactory<RealmRolesClaimsPrincipalFactory>();
 
+// "Minhas Compras"/consulta de status são conceitualmente do cliente comprador — mas
+// `vendedor@revendax.local` também carrega a role `cliente` (default-roles-clientes, mesma
+// particularidade documentada desde a US1.5/US3.1), então `Roles = "cliente"` sozinho não
+// escondia essas telas de uma conta de vendedor. Só decisão de UX do frontend — o backend não
+// tem (nem precisa ter) essa distinção, aceita o token do vendedor normalmente em `/compras`.
+builder.Services.AddAuthorizationCore(options => options.AddPolicy(
+    "SomenteCliente",
+    policy => policy.RequireAssertion(ctx => ctx.User.IsInRole("cliente") && !ctx.User.IsInRole("vendedor"))));
+
 // Dois clients nomeados pro gateway, não um só — "Gateway" (com AuthorizationMessageHandler)
 // só serve chamadas de usuário autenticado (US4.4/US4.5). Descoberto na US4.2: o handler
 // lança AccessTokenNotAvailableException quando não há usuário logado (não segue sem token
