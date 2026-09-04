@@ -26,10 +26,10 @@ planejamento da atividade acadêmica, não parte da entrega.
 > exclusão/soft delete (US2.5), `vendas-api` já com Clean Architecture e persistência própria
 > (EF Core + Postgres). **Épico 3 (Compras) em andamento** — início de compra (US3.1)
 > implementado (`POST /compras`, reserva o veículo e cria a compra `Pendente`); concorrência
-> entre compras simultâneas (US3.2, controle otimista via `xmin`) e efetivação da compra via
-> webhook de pagamento simulado (US3.3) também implementadas; consulta de status e expiração
-> automática de reservas ainda não implementados. `gateway` ainda é só o esqueleto
-> (build, testes, Docker, roteamento).
+> entre compras simultâneas (US3.2, controle otimista via `xmin`), efetivação da compra via
+> webhook de pagamento simulado (US3.3) e consulta de status pelo dono (US3.4, `GET
+> /compras/{id}`) também implementadas; expiração automática de reservas ainda não
+> implementada. `gateway` ainda é só o esqueleto (build, testes, Docker, roteamento).
 
 ## Como rodar localmente
 
@@ -293,6 +293,18 @@ novo, sem erro e sem mudar nada. Compra `Cancelada` → 409; `id` inexistente �
 ausente/incorreto → 401. Depois da confirmação, o veículo aparece em `GET /veiculos/vendidos`
 (US2.4) e some de `GET /veiculos` (US2.3).
 
+## Testar a consulta de status da compra (US3.4)
+
+`GET /compras/{id}` — restrito à role `cliente` **e** ao dono da compra:
+
+```bash
+curl http://localhost:8080/vendas/compras/{id} -H "Authorization: Bearer $TOKEN_CLIENTE"
+# 200 — { "id": "...", "status": "Pendente" | "Concluida" | "Cancelada", ... }
+```
+
+`id` inexistente **ou** de uma compra de outro cliente → 404 (nunca 403 — não confirma pra um
+cliente que um id alheio existe). Sem token → 401; token sem role `cliente` → 403.
+
 ## Testar a recuperação de senha (US1.4)
 
 `identity-api` só dispara o e-mail — a troca de senha acontece na página hospedada do
@@ -335,9 +347,10 @@ cadastro (`POST /veiculos`), edição (`PUT /veiculos/{id}`), as duas listagens
 (`GET /veiculos`, pública; `GET /veiculos/vendidos`, restrita a `vendedor`), exclusão/soft
 delete (`DELETE /veiculos/{id}`), início de compra (`POST /compras`), concorrência entre
 compras simultâneas para o mesmo veículo (requisições HTTP concorrentes reais via
-`Task.WhenAll`) e efetivação da compra via webhook simulado
-(`POST /compras/{id}/confirmar-pagamento`), incluindo consultas diretas ao Postgres do teste
-para confirmar que os dados persistidos batem com o que foi enviado, não só a resposta HTTP).
+`Task.WhenAll`), efetivação da compra via webhook simulado
+(`POST /compras/{id}/confirmar-pagamento`) e consulta de status pelo dono
+(`GET /compras/{id}`), incluindo consultas diretas ao Postgres do teste para confirmar que os
+dados persistidos batem com o que foi enviado, não só a resposta HTTP).
 
 `gateway` ainda só cobre o esqueleto (`GET /health`).
 
