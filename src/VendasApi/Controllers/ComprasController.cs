@@ -6,16 +6,17 @@ using VendasApi.Auth;
 namespace VendasApi.Controllers;
 
 /// <summary>
-/// Início da compra (US3.1) e confirmação de pagamento (US3.3). Camada fina: só bind + delega
-/// ao caso de uso. Exceções de domínio (veículo não encontrado, veículo indisponível, compra
-/// não encontrada/cancelada) são traduzidas para status HTTP pelo
+/// Início da compra (US3.1), confirmação de pagamento (US3.3) e consulta de status (US3.4).
+/// Camada fina: só bind + delega ao caso de uso. Exceções de domínio (veículo não encontrado,
+/// veículo indisponível, compra não encontrada/cancelada) são traduzidas para status HTTP pelo
 /// <see cref="ExceptionHandling.DomainExceptionHandler"/> global, não aqui — ver Program.cs.
 /// </summary>
 [ApiController]
 [Route("compras")]
 public class ComprasController(
     IIniciarCompraUseCase iniciarCompraUseCase,
-    IConfirmarPagamentoUseCase confirmarPagamentoUseCase)
+    IConfirmarPagamentoUseCase confirmarPagamentoUseCase,
+    IConsultarCompraUseCase consultarCompraUseCase)
     : ControllerBase
 {
     [HttpPost]
@@ -51,6 +52,25 @@ public class ComprasController(
     public async Task<IActionResult> ConfirmarPagamento(Guid id, CancellationToken cancellationToken)
     {
         var resultado = await confirmarPagamentoUseCase.ExecutarAsync(id, cancellationToken);
+        return Ok(resultado);
+    }
+
+    /// <summary>
+    /// Consulta de status pelo dono da compra (US3.4) — compra inexistente ou de outro
+    /// cliente retornam 404 igualmente, nunca 403 (ver <see cref="ConsultarCompraUseCase"/>).
+    /// </summary>
+    [HttpGet("{id:guid}")]
+    [Authorize(Roles = "cliente")]
+    [ProducesResponseType(typeof(CompraResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Consultar(Guid id, CancellationToken cancellationToken)
+    {
+        var clienteId = User.FindFirst("sub")?.Value
+            ?? throw new InvalidOperationException("Token autenticado sem claim 'sub'.");
+
+        var resultado = await consultarCompraUseCase.ExecutarAsync(id, clienteId, cancellationToken);
         return Ok(resultado);
     }
 }
