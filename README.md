@@ -8,6 +8,34 @@ Documentação de arquitetura (diagramas C4, fluxo ponta-a-ponta) e as decisões
 O backlog e o detalhamento de cada história ficam fora deste repositório — são material de
 planejamento da atividade acadêmica, não parte da entrega.
 
+**Como foi implementado**: Clean Architecture em três serviços (`gateway`, `identity-api`,
+`vendas-api`), cada um com camadas `Domain`/`Application`/`Infrastructure` próprias.
+`identity-api` delega toda persistência de cliente ao Keycloak (nenhum banco próprio);
+`vendas-api` tem banco dedicado (Postgres via EF Core) para veículos e compras. Autenticação e
+autorização por role via JWT validado localmente (JWKS), sem `identity-api` no caminho de
+cada requisição. Testes de integração sempre contra dependências reais (Postgres, Keycloak,
+Mailpit) via **Testcontainers** — nunca mock de banco ou identity provider.
+
+## Índice
+
+- [Serviços](#serviços) · [Como rodar localmente](#como-rodar-localmente)
+- Identidade: [US1.1 Cadastro](#testar-o-cadastro-de-cliente-us11) ·
+  [US1.2 Login](#testar-o-login-us12) ·
+  [US1.3 Validação de token](#testar-a-validação-de-token-us13) ·
+  [US1.4 Recuperação de senha](#testar-a-recuperação-de-senha-us14) ·
+  [US1.5 Role vendedor](#testar-a-role-vendedor-us15)
+- Veículos: [US2.1 Cadastro](#testar-o-cadastro-de-veículo-us21) ·
+  [US2.2 Edição](#testar-a-edição-de-veículo-us22) ·
+  [US2.3 Listagem à venda](#testar-a-listagem-de-veículos-à-venda-us23) ·
+  [US2.4 Listagem vendidos](#testar-a-listagem-de-veículos-vendidos-us24) ·
+  [US2.5 Exclusão](#testar-a-exclusão-de-veículo-us25)
+- Compras: [US3.1 Compra](#testar-a-compra-de-veículo-us31) ·
+  [US3.2 Concorrência](#concorrência-na-compra-us32) ·
+  [US3.3 Efetivação](#testar-a-efetivação-da-compra-confirmação-de-pagamento-us33) ·
+  [US3.4 Status](#testar-a-consulta-de-status-da-compra-us34) ·
+  [US3.5 Expiração](#expiração-automática-de-reservas-us35)
+- [Como testar](#como-testar) · [Estrutura](#estrutura)
+
 ## Serviços
 
 | Serviço | Descrição | Porta local (docker-compose) |
@@ -135,6 +163,23 @@ curl -o /dev/null -w "%{http_code}\n" http://localhost:8080/vendas/whoami
 > do token variaria conforme o host/porta usado pra logar (ex.: `localhost:8081`, a porta
 > externa), enquanto `vendas-api` valida via hostname interno do Docker (`keycloak:8080`) —
 > os dois nunca bateriam e todo token seria rejeitado como "issuer inválido".
+
+## Testar a recuperação de senha (US1.4)
+
+`identity-api` só dispara o e-mail — a troca de senha acontece na página hospedada do
+Keycloak. E-mails de desenvolvimento são capturados pelo **Mailpit**, UI em
+`http://localhost:8025`:
+
+```bash
+curl -X POST http://localhost:8080/identity/clientes/recuperar-senha \
+  -H "Content-Type: application/json" -d '{"email": "maria@example.com"}'
+# 202 — sempre, exista ou não o e-mail (evita enumeração de contas)
+```
+
+Abra `http://localhost:8025` para ver o e-mail capturado. O link de redefinição já vem
+apontando para `http://localhost:8081/realms/clientes/login-actions/...` — abre direto no
+navegador do host, sem troca manual de hostname (isso exigia um workaround manual antes da
+US4.1, quando `KC_HOSTNAME` ainda apontava pro hostname interno do Docker).
 
 ## Testar a role `vendedor` (US1.5)
 
