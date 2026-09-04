@@ -1,5 +1,5 @@
 @page "/minhas-compras"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "cliente")]
 @using System.Globalization
 @using Frontend.Models
 @inject IHttpClientFactory HttpClientFactory

@@ -5,7 +5,7 @@
         <div class="header-nav">
             <a href="/" class="logo">Revenda<span class="logo-accent">X</span></a>
             <a href="/veiculos" class="nav-link">Catálogo</a>
-            <AuthorizeView>
+            <AuthorizeView Roles="cliente">
                 <Authorized>
                     <a href="/minhas-compras" class="nav-link">Minhas Compras</a>
                 </Authorized>

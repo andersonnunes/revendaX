@@ -1,5 +1,5 @@
 @page "/compras/{Id:guid}"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "cliente")]
 @using System.Globalization
 @using System.Net
 @using Frontend.Models
