@@ -121,6 +121,23 @@ public class Veiculo
         Status = StatusVeiculo.Reservado;
     }
 
+    /// <summary>
+    /// Efetiva a venda (US3.3) — só permitido a partir de <see cref="StatusVeiculo.Reservado"/>.
+    /// Defesa em profundidade, não um caminho alcançável pelo fluxo normal: uma compra
+    /// `Pendente` sempre corresponde a um veículo `Reservado` (invariante garantida pela
+    /// gravação atômica das US3.1/US3.2), então este guard só dispararia com dado corrompido
+    /// em outro lugar.
+    /// </summary>
+    public void MarcarComoVendido()
+    {
+        if (Status != StatusVeiculo.Reservado)
+        {
+            throw new VeiculoNaoReservadoException();
+        }
+
+        Status = StatusVeiculo.Vendido;
+    }
+
     private static void ValidarAnoEPreco(int ano, decimal preco)
     {
         var anoMaximo = DateTimeOffset.UtcNow.Year + 1;

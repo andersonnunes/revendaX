@@ -1,3 +1,5 @@
+using VendasApi.Domain.Exceptions;
+
 namespace VendasApi.Domain.Compras;
 
 /// <summary>
@@ -43,4 +45,21 @@ public class Compra
         Status = StatusCompra.Pendente,
         CriadoEm = DateTimeOffset.UtcNow,
     };
+
+    /// <summary>
+    /// Confirma o pagamento (US3.3) — só permitido a partir de <see cref="StatusCompra.Pendente"/>.
+    /// Idempotência (reentrega de webhook numa compra já <see cref="StatusCompra.Concluida"/>)
+    /// não é responsabilidade deste método — é cortada antes, no caso de uso, que nem chega a
+    /// chamar isto para uma compra já concluída. O guard aqui só protege o caso restante:
+    /// compra `Cancelada`, um conflito de fato, não um retry legítimo.
+    /// </summary>
+    public void ConfirmarPagamento()
+    {
+        if (Status != StatusCompra.Pendente)
+        {
+            throw new CompraCanceladaException();
+        }
+
+        Status = StatusCompra.Concluida;
+    }
 }
