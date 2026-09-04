@@ -1,0 +1,86 @@
+@page "/compras/{Id:guid}"
+@attribute [Authorize(Policy = "SomenteCliente")]
+@using System.Globalization
+@using System.Net
+@using Frontend.Models
+@inject IHttpClientFactory HttpClientFactory
+
+<PageTitle>Minha compra — RevendaX</PageTitle>
+
+<main class="main-content">
+    <a href="/veiculos" class="back-link">&larr; Voltar ao catálogo</a>
+
+    <div class="glass-card" style="max-width: 480px; margin: 0 auto;">
+        @if (erro is not null)
+        {
+            <div class="toast error" style="margin-bottom: 18px; min-width: 0; width: 100%;">
+                <span class="toast-message">@erro</span>
+            </div>
+        }
+        else if (compra is null)
+        {
+            <p class="list-placeholder">Carregando…</p>
+        }
+        else
+        {
+            <span class="status-badge @compra.Status.ToLowerInvariant()">@compra.Status</span>
+            <h2 style="margin-top: 12px;">Compra</h2>
+            <div class="specs">
+                <span>Veículo: @compra.VeiculoId</span>
+            </div>
+            <p class="price">@compra.Preco.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))</p>
+            <p class="form-footer" style="text-align: left; margin-top: 0;">
+                Criada em @compra.CriadoEm.ToLocalTime().ToString("g")
+            </p>
+
+            <button class="btn secondary block" @onclick="CarregarAsync" disabled="@carregando">
+                @(carregando ? "Atualizando…" : "Atualizar status")
+            </button>
+        }
+    </div>
+</main>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private CompraDto? compra;
+    private string? erro;
+    private bool carregando;
+
+    // "Gateway" (autenticado, US4.1) — GET /compras/{id} exige role cliente (US3.4); ao
+    // contrário de US4.2/US4.3, esta chamada precisa mesmo do token.
+    private HttpClient Gateway => HttpClientFactory.CreateClient("Gateway");
+
+    protected override Task OnInitializedAsync() => CarregarAsync();
+
+    private async Task CarregarAsync()
+    {
+        carregando = true;
+        erro = null;
+        try
+        {
+            var resposta = await Gateway.GetAsync($"vendas/compras/{Id}");
+            if (resposta.IsSuccessStatusCode)
+            {
+                compra = await resposta.Content.ReadFromJsonAsync<CompraDto>();
+            }
+            else if (resposta.StatusCode == HttpStatusCode.NotFound)
+            {
+                erro = "Compra não encontrada (ou não pertence à sua conta).";
+            }
+            else
+            {
+                erro = "Não foi possível carregar o status da compra.";
+            }
+        }
+        catch (HttpRequestException)
+        {
+            erro = "Não foi possível conectar ao servidor. Tente novamente.";
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}

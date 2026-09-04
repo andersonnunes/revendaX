@@ -17,6 +17,7 @@ planejamento da atividade acadêmica, não parte da entrega.
 | `vendas-api` | Catálogo de veículos e compras (Postgres próprio, `vendas-db`) | `5082` (debug direto) |
 | Keycloak | Identity Provider (realm `clientes`, importado automaticamente do export commitado) | `8081` |
 | Mailpit | SMTP fake de dev (US1.4) — captura os e-mails de redefinição de senha | `8025` (UI/API) |
+| `frontend` | UI web (Blazor WebAssembly, bônus além do pedido do PDF) — login via Keycloak | `8082` |
 
 > **Status atual**: Épico 1 (Identidade) completo — cadastro (US1.1), login direto no Keycloak
 > (US1.2), validação de token no `vendas-api` via JWKS (US1.3, endpoint `/whoami` de
@@ -29,7 +30,9 @@ planejamento da atividade acadêmica, não parte da entrega.
 > simultâneas (US3.2, controle otimista via `xmin`), efetivação da compra via webhook de
 > pagamento simulado (US3.3), consulta de status pelo dono (US3.4, `GET /compras/{id}`) e
 > expiração automática de reservas não pagas (US3.5, job em background). `gateway` ainda é só
-> o esqueleto (build, testes, Docker, roteamento).
+> o esqueleto (build, testes, Docker, roteamento). **Frontend web (bônus, além do escopo
+> pedido no PDF) em andamento** — login via Keycloak (Authorization Code + PKCE) implementado
+> (US4.1), Blazor WebAssembly.
 
 ## Como rodar localmente
 
@@ -132,9 +135,13 @@ curl -o /dev/null -w "%{http_code}\n" http://localhost:8080/vendas/whoami
 ```
 
 > Sem `KC_HOSTNAME` fixo no Keycloak (já configurado em `infra/docker-compose.yml`), o `iss`
-> do token variaria conforme o host/porta usado pra logar (ex.: `localhost:8081`, a porta
-> externa), enquanto `vendas-api` valida via hostname interno do Docker (`keycloak:8080`) —
-> os dois nunca bateriam e todo token seria rejeitado como "issuer inválido".
+> do token variaria conforme o host/porta usado pra logar, enquanto `vendas-api` validaria
+> contra outro valor — os dois nunca bateriam e todo token seria rejeitado como "issuer
+> inválido". `KC_HOSTNAME=http://localhost:8081` (o endereço que o navegador enxerga, desde a
+> US4.1) fixa o `iss`; `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true` mantém `jwks_uri`/`token_endpoint`
+> resolvendo pelo hostname interno do Docker quando quem pergunta é um container
+> (`identity-api`/`vendas-api`) — sem isso, esses serviços não conseguiriam alcançar
+> `localhost:8081` de dentro do próprio container pra buscar as chaves JWKS.
 
 ## Testar a role `vendedor` (US1.5)
 
@@ -305,6 +312,14 @@ curl http://localhost:8080/vendas/compras/{id} -H "Authorization: Bearer $TOKEN_
 `id` inexistente **ou** de uma compra de outro cliente → 404 (nunca 403 — não confirma pra um
 cliente que um id alheio existe). Sem token → 401; token sem role `cliente` → 403.
 
+`GET /compras` (sem id) lista **todas** as compras do cliente autenticado, qualquer status,
+mais recente primeiro — `clienteId` vem só do `sub` do token, nunca de parâmetro de rota/query:
+
+```bash
+curl http://localhost:8080/vendas/compras -H "Authorization: Bearer $TOKEN_CLIENTE"
+# 200 — [ { "id": "...", "status": "...", ... }, ... ] (lista vazia se o cliente não tiver nenhuma)
+```
+
 ## Expiração automática de reservas (US3.5)
 
 Uma compra `Pendente` que não é paga em 30 minutos (`Compras:TimeoutReservaMinutos`) é
@@ -332,12 +347,21 @@ curl -X POST http://localhost:8080/identity/clientes/recuperar-senha \
 # 202 — sempre, exista ou não o e-mail (evita enumeração de contas)
 ```
 
-Abra `http://localhost:8025` para ver o e-mail capturado. O link de redefinição vem apontando
-para o hostname **interno** do Docker (`http://keycloak:8080/realms/clientes/login-actions/...`,
-necessário para o `iss` dos tokens ficar consistente — ver seção anterior) — para
-efetivamente abrir no navegador do host (ex.: gravando o vídeo de demonstração), troque
-`keycloak:8080` por `localhost:8081` na URL copiada do Mailpit; o restante do link (o token
-de ação) funciona igual em qualquer um dos dois hosts.
+Abra `http://localhost:8025` para ver o e-mail capturado. O link de redefinição já vem
+apontando para `http://localhost:8081/realms/clientes/login-actions/...` — abre direto no
+navegador do host, sem troca manual de hostname (isso exigia um workaround manual antes da
+US4.1, quando `KC_HOSTNAME` ainda apontava pro hostname interno do Docker).
+
+## Frontend web (bônus)
+
+Não pedido pelo PDF do desafio — feito como extra. UI em `http://localhost:8082`, Blazor
+WebAssembly servido como estático via nginx. Fala direto com o Keycloak pra login
+(Authorization Code + PKCE, não ROPC — diferente do resto deste README, que usa ROPC via
+`curl` porque é a forma direta de testar a API) e com o `gateway` pras chamadas de API.
+
+O client `vendas-frontend` no Keycloak mantém os dois fluxos ao mesmo tempo: ROPC (usado pelos
+exemplos deste README e pela suíte de testes automatizados) continua funcionando sem nenhuma
+mudança; Authorization Code + PKCE é o que a UI usa de fato.
 
 ## Como testar
 

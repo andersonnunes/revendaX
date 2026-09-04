@@ -1,0 +1,155 @@
+@page "/veiculos"
+@using System.Globalization
+@using System.Net
+@using Frontend.Models
+@inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Navigation
+
+<PageTitle>Catálogo — RevendaX</PageTitle>
+
+<main class="main-content">
+    <h2>Veículos à venda</h2>
+    <p class="subtitle">Ordenados por preço, direto do estoque da revendedora.</p>
+
+    @if (erroCompra is not null)
+    {
+        <div class="toast error" style="margin-bottom: 18px; min-width: 0; width: 100%;">
+            <span class="toast-message">@erroCompra</span>
+        </div>
+    }
+
+    @if (erro is not null)
+    {
+        <div class="toast error" style="margin-bottom: 18px; min-width: 0; width: 100%;">
+            <span class="toast-message">@erro</span>
+        </div>
+    }
+    else if (veiculos is null)
+    {
+        <p class="list-placeholder">Carregando veículos…</p>
+    }
+    else if (veiculos.Count == 0)
+    {
+        <p class="empty-state">Nenhum veículo disponível no momento.</p>
+    }
+    else
+    {
+        <div class="vehicle-grid">
+            @foreach (var veiculo in veiculos)
+            {
+                <div class="glass-card vehicle-card">
+                    <span class="status-badge disponivel">@veiculo.Status</span>
+                    <h3>@veiculo.Marca @veiculo.Modelo</h3>
+                    <div class="specs">
+                        <span>@veiculo.Ano</span>
+                        <span>&middot;</span>
+                        <span>@veiculo.Cor</span>
+                    </div>
+                    <span class="price">@veiculo.Preco.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))</span>
+
+                    <AuthorizeView Policy="SomenteCliente" Context="authContext">
+                        <Authorized>
+                            @if (confirmandoId == veiculo.Id)
+                            {
+                                <button class="btn primary block" disabled="@comprando"
+                                        @onclick="() => ConfirmarCompraAsync(veiculo)">
+                                    @(comprando ? "Comprando…" : $"Confirmar compra por {veiculo.Preco.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))}?")
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn primary block" @onclick="() => confirmandoId = veiculo.Id">
+                                    Comprar
+                                </button>
+                            }
+                        </Authorized>
+                        <NotAuthorized>
+                            @if (authContext.User.Identity?.IsAuthenticated == true)
+                            {
+                                <p class="field-error" style="margin: 0;">Sua conta não pode comprar.</p>
+                            }
+                            else
+                            {
+                                <a class="btn primary block" href="authentication/login">Entre para comprar</a>
+                            }
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </div>
+            }
+        </div>
+    }
+</main>
+
+@code {
+    private List<VeiculoDto>? veiculos;
+    private string? erro;
+    private string? erroCompra;
+    private Guid? confirmandoId;
+    private bool comprando;
+
+    // "GatewayPublico" (US4.2) — vitrine é pública (US2.3), "Gateway" (autenticado) lançaria
+    // AccessTokenNotAvailableException pra um visitante não logado.
+    private HttpClient GatewayPublico => HttpClientFactory.CreateClient("GatewayPublico");
+
+    // "Gateway" (US4.1, autenticado) — POST /compras exige role cliente (US3.1); só usado pelo
+    // fluxo de compra, nunca pra carregar a listagem em si.
+    private HttpClient GatewayAutenticado => HttpClientFactory.CreateClient("Gateway");
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            veiculos = await GatewayPublico.GetFromJsonAsync<List<VeiculoDto>>("vendas/veiculos") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            erro = "Não foi possível carregar o catálogo. Tente novamente em instantes.";
+        }
+    }
+
+    private async Task ConfirmarCompraAsync(VeiculoDto veiculo)
+    {
+        erroCompra = null;
+        comprando = true;
+        try
+        {
+            var resposta = await GatewayAutenticado.PostAsJsonAsync("vendas/compras", new { veiculoId = veiculo.Id });
+
+            if (resposta.IsSuccessStatusCode)
+            {
+                var compra = await resposta.Content.ReadFromJsonAsync<CompraDto>();
+                if (compra is not null)
+                {
+                    Navigation.NavigateTo($"/compras/{compra.Id}");
+                }
+
+                return;
+            }
+
+            if (resposta.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.NotFound)
+            {
+                // Veículo não existe mais ou já foi comprado por outra sessão — some da vitrine
+                // sem esperar um novo carregamento (só nestes dois casos: o veículo realmente
+                // deixou de estar disponível, diferente de um erro transitório de rede/servidor).
+                veiculos?.Remove(veiculo);
+            }
+
+            erroCompra = resposta.StatusCode switch
+            {
+                HttpStatusCode.Conflict =>
+                    $"{veiculo.Marca} {veiculo.Modelo} não está mais disponível — outra pessoa comprou primeiro.",
+                HttpStatusCode.NotFound => "Este veículo não existe mais.",
+                _ => "Não foi possível concluir a compra. Tente novamente.",
+            };
+        }
+        catch (HttpRequestException)
+        {
+            erroCompra = "Não foi possível conectar ao servidor. Tente novamente.";
+        }
+        finally
+        {
+            confirmandoId = null;
+            comprando = false;
+        }
+    }
+}

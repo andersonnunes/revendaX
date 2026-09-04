@@ -1,0 +1,70 @@
+@page "/minhas-compras"
+@attribute [Authorize(Policy = "SomenteCliente")]
+@using System.Globalization
+@using Frontend.Models
+@inject IHttpClientFactory HttpClientFactory
+
+<PageTitle>Minhas compras — RevendaX</PageTitle>
+
+<main class="main-content">
+    <h2>Minhas compras</h2>
+    <p class="subtitle">Todas as suas compras, mais recente primeiro.</p>
+
+    @if (erro is not null)
+    {
+        <div class="toast error" style="margin-bottom: 18px; min-width: 0; width: 100%;">
+            <span class="toast-message">@erro</span>
+        </div>
+    }
+    else if (carregando)
+    {
+        <p class="list-placeholder">Carregando…</p>
+    }
+    else if (compras.Count == 0)
+    {
+        <p class="empty-state">Nenhuma compra ainda. <a href="/veiculos">Ver catálogo</a>.</p>
+    }
+    else
+    {
+        <div class="vehicle-grid">
+            @foreach (var compra in compras)
+            {
+                <a href="@($"/compras/{compra.Id}")" class="glass-card vehicle-card" style="text-decoration: none; color: inherit;">
+                    <span class="status-badge @compra.Status.ToLowerInvariant()">@compra.Status</span>
+                    <span class="price">@compra.Preco.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))</span>
+                    <div class="specs">
+                        <span>@compra.CriadoEm.ToLocalTime().ToString("g")</span>
+                    </div>
+                </a>
+            }
+        </div>
+    }
+</main>
+
+@code {
+    private List<CompraDto> compras = [];
+    private bool carregando = true;
+    private string? erro;
+
+    // "Gateway" (autenticado) — mesma razão da CompraStatus.razor.
+    private HttpClient Gateway => HttpClientFactory.CreateClient("Gateway");
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // GET /compras (extensão da US3.4, motivada por esta própria tela) — já vem
+            // filtrado pelo `sub` do token e ordenado mais recente primeiro no servidor; não
+            // precisa mais do histórico em localStorage que esta página usava antes.
+            compras = await Gateway.GetFromJsonAsync<List<CompraDto>>("vendas/compras") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            erro = "Não foi possível carregar suas compras. Tente novamente em instantes.";
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}

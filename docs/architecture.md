@@ -92,7 +92,7 @@ C4Container
 
 ## Fluxo ponta-a-ponta (demonstração)
 
-Corresponde ao teste início-a-fim exigido no vídeo de demonstração (US4.6): cadastro de
+Corresponde ao teste início-a-fim exigido no vídeo de demonstração (US5.6): cadastro de
 cliente, cadastro de veículo, compra e efetivação da compra.
 
 ```mermaid

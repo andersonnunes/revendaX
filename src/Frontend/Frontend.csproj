@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" Version="10.0.11" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.11" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- CpfValidator (US4.2) — classe de domínio pura, sem dependência server-only, segura de
+         referenciar direto do WebAssembly: mesma regra do backend, sem duplicar em C#/JS. -->
+    <ProjectReference Include="../IdentityApi.Domain/IdentityApi.Domain.csproj" />
+    <!-- PlacaValidator (US4.5) — mesmo tratamento do CpfValidator acima. -->
+    <ProjectReference Include="../VendasApi.Domain/VendasApi.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
