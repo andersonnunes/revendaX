@@ -15,7 +15,7 @@ planejamento da atividade acadêmica, não parte da entrega.
 | `gateway` | Porta única de entrada (YARP) — roteia `/identity/**` e `/vendas/**` | `8080` |
 | `identity-api` | Cadastro de clientes — única credencial com permissão de escrita no Keycloak | `5081` (debug direto) |
 | `vendas-api` | Catálogo de veículos e compras (Postgres próprio, `vendas-db`) | `5082` (debug direto) |
-| Keycloak | Identity Provider (realm `clientes`, ainda não configurado — ver status abaixo) | `8081` |
+| Keycloak | Identity Provider (realm `clientes`, importado automaticamente do export commitado) | `8081` |
 | Mailpit | SMTP fake de dev (US1.4) — captura os e-mails de redefinição de senha | `8025` (UI/API) |
 
 > **Status atual**: Épico 1 (Identidade) completo — cadastro (US1.1), login direto no Keycloak
