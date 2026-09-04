@@ -1,0 +1,82 @@
+@page "/veiculos"
+@using System.Globalization
+@inject IHttpClientFactory HttpClientFactory
+
+<PageTitle>Catálogo — RevendaX</PageTitle>
+
+<main class="main-content">
+    <h2>Veículos à venda</h2>
+    <p class="subtitle">Ordenados por preço, direto do estoque da revendedora.</p>
+
+    @if (erro is not null)
+    {
+        <div class="toast error" style="margin-bottom: 18px; min-width: 0; width: 100%;">
+            <span class="toast-message">@erro</span>
+        </div>
+    }
+    else if (veiculos is null)
+    {
+        <p class="list-placeholder">Carregando veículos…</p>
+    }
+    else if (veiculos.Count == 0)
+    {
+        <p class="empty-state">Nenhum veículo disponível no momento.</p>
+    }
+    else
+    {
+        <div class="vehicle-grid">
+            @foreach (var veiculo in veiculos)
+            {
+                <div class="glass-card vehicle-card">
+                    <span class="status-badge disponivel">@veiculo.Status</span>
+                    <h3>@veiculo.Marca @veiculo.Modelo</h3>
+                    <div class="specs">
+                        <span>@veiculo.Ano</span>
+                        <span>&middot;</span>
+                        <span>@veiculo.Cor</span>
+                    </div>
+                    <span class="price">@veiculo.Preco.ToString("C", CultureInfo.GetCultureInfo("pt-BR"))</span>
+                </div>
+            }
+        </div>
+    }
+</main>
+
+@code {
+    // Formato próprio do Frontend, não IdentityApi.Application.VeiculoResult via
+    // ProjectReference — decisão registrada na US4.3: VeiculoResult é só forma de dados (sem
+    // lógica que valha a pena não duplicar, diferente do CpfValidator da US4.2), e referenciar
+    // o assembly inteiro do VendasApi.Application acoplaria o frontend a tipos internos do
+    // backend (comandos/portas de outros casos de uso) sem necessidade nenhuma pra esta tela.
+    private sealed class VeiculoDto
+    {
+        public Guid Id { get; set; }
+        public string Marca { get; set; } = string.Empty;
+        public string Modelo { get; set; } = string.Empty;
+        public int Ano { get; set; }
+        public string Cor { get; set; } = string.Empty;
+        public decimal Preco { get; set; }
+        public string Placa { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public DateTimeOffset CriadoEm { get; set; }
+    }
+
+    private List<VeiculoDto>? veiculos;
+    private string? erro;
+
+    // "GatewayPublico" (US4.2) — vitrine é pública (US2.3), "Gateway" (autenticado) lançaria
+    // AccessTokenNotAvailableException pra um visitante não logado.
+    private HttpClient Gateway => HttpClientFactory.CreateClient("GatewayPublico");
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            veiculos = await Gateway.GetFromJsonAsync<List<VeiculoDto>>("vendas/veiculos") ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            erro = "Não foi possível carregar o catálogo. Tente novamente em instantes.";
+        }
+    }
+}

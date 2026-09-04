@@ -127,8 +127,15 @@ a { color: var(--accent); }
   gap: 16px;
 }
 
+.header-nav { display: flex; align-items: center; gap: 24px; }
+
 .logo { font-family: var(--font-header); font-weight: 800; font-size: 22px; letter-spacing: -0.4px; }
 .logo-accent { color: var(--accent); }
+
+/* Link de navegação do cabeçalho (US4.3) — mesma cor/hover do .back-link, mas sem a seta
+   "voltar" (não faz sentido pra um link que leva pra frente, não de volta). */
+.nav-link { color: var(--text-secondary); text-decoration: none; font-size: 14px; font-weight: 600; }
+.nav-link:hover { color: var(--text-primary); }
 
 .status-pill { font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px; }
 .status-pill.online { background: rgba(163, 230, 53, 0.15); color: var(--neon-green); }
