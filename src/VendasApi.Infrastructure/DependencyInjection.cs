@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using VendasApi.Application.Ports;
+using VendasApi.Infrastructure.Compras;
 using VendasApi.Infrastructure.Persistence;
 
 namespace VendasApi.Infrastructure;
@@ -24,6 +26,10 @@ public static class DependencyInjection
         services.AddScoped<IVeiculoRepository, EfVeiculoRepository>();
         services.AddScoped<ICompraRepository, EfCompraRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // Expiração automática de reservas não pagas (US3.5) — sobe junto com o processo do
+        // vendas-api, sem infraestrutura de agendamento externa.
+        services.AddHostedService<ExpiracaoReservaBackgroundService>();
 
         return services;
     }
