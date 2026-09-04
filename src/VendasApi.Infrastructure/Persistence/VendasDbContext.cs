@@ -28,6 +28,20 @@ public class VendasDbContext(DbContextOptions<VendasDbContext> options) : DbCont
             // requisições concorrentes com a mesma placa (a checagem em memória sozinha não
             // impede isso).
             veiculo.HasIndex(v => v.Placa).IsUnique();
+
+            // Concorrência otimista via xmin (coluna de sistema do Postgres) — todo UPDATE de
+            // Veiculo passa a checar se a linha mudou desde a leitura; se mudou, o EF Core
+            // lança DbUpdateConcurrencyException (mapeada para 409 no DomainExceptionHandler).
+            // Protege qualquer escrita concorrente sobre o mesmo veículo — não só duas compras
+            // disputando o mesmo registro, também uma edição correndo contra uma compra.
+            //
+            // Shadow property (sem CLR property em Veiculo — Domain continua sem saber que
+            // existe controle de concorrência), não o método de conveniência
+            // `UseXminAsConcurrencyToken()`: ele existia no provider Npgsql até a versão 8.x e
+            // foi removido a partir da 9.x (confirmado inspecionando o assembly instalado) —
+            // este projeto está pinado em 10.0.3. O nome da shadow property já mapeia para a
+            // coluna física `xmin` por convenção, sem precisar de `HasColumnName`.
+            veiculo.Property<uint>("xmin").IsRowVersion();
         });
 
         modelBuilder.Entity<Compra>(compra =>
