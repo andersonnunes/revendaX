@@ -26,9 +26,9 @@ planejamento da atividade acadêmica, não parte da entrega.
 > exclusão/soft delete (US2.5), `vendas-api` já com Clean Architecture e persistência própria
 > (EF Core + Postgres). **Épico 3 (Compras) em andamento** — início de compra (US3.1)
 > implementado (`POST /compras`, reserva o veículo e cria a compra `Pendente`); concorrência
-> entre compras simultâneas (US3.2, controle otimista via `xmin`) também implementada;
-> efetivação (confirmação de pagamento), consulta de status e expiração automática de reservas
-> ainda não implementados. `gateway` ainda é só o esqueleto
+> entre compras simultâneas (US3.2, controle otimista via `xmin`) e efetivação da compra via
+> webhook de pagamento simulado (US3.3) também implementadas; consulta de status e expiração
+> automática de reservas ainda não implementados. `gateway` ainda é só o esqueleto
 > (build, testes, Docker, roteamento).
 
 ## Como rodar localmente
@@ -274,6 +274,25 @@ wait
 
 Sem retentativa automática da requisição perdedora — cabe ao cliente tentar outro veículo.
 
+## Testar a efetivação da compra (confirmação de pagamento, US3.3)
+
+`POST /compras/{id}/confirmar-pagamento` simula o callback de um gateway de pagamento — não
+tem `[Authorize]` de usuário (não há cliente/vendedor logado nesse fluxo), é protegido por um
+segredo compartilhado no header `X-Webhook-Secret` (`dev-webhook-secret` no
+`docker-compose.yml`, valor de desenvolvimento). Confirma o pagamento, muda a compra para
+`Concluida` e o veículo para `Vendido`:
+
+```bash
+curl -X POST http://localhost:8080/vendas/compras/{id}/confirmar-pagamento \
+  -H "X-Webhook-Secret: dev-webhook-secret"
+# 200 — { "id": "...", "status": "Concluida", ... }
+```
+
+Idempotente: confirmar de novo uma compra já `Concluida` (reentrega do webhook) retorna 200 de
+novo, sem erro e sem mudar nada. Compra `Cancelada` → 409; `id` inexistente → 404; header
+ausente/incorreto → 401. Depois da confirmação, o veículo aparece em `GET /veiculos/vendidos`
+(US2.4) e some de `GET /veiculos` (US2.3).
+
 ## Testar a recuperação de senha (US1.4)
 
 `identity-api` só dispara o e-mail — a troca de senha acontece na página hospedada do
@@ -314,10 +333,11 @@ todas as classes de teste do projeto via `[Collection]`, para não subir um par 
 por classe; cobre validação de token — `/whoami`, `/whoami/cliente`, `/whoami/vendedor` —,
 cadastro (`POST /veiculos`), edição (`PUT /veiculos/{id}`), as duas listagens
 (`GET /veiculos`, pública; `GET /veiculos/vendidos`, restrita a `vendedor`), exclusão/soft
-delete (`DELETE /veiculos/{id}`), início de compra (`POST /compras`) e concorrência entre
+delete (`DELETE /veiculos/{id}`), início de compra (`POST /compras`), concorrência entre
 compras simultâneas para o mesmo veículo (requisições HTTP concorrentes reais via
-`Task.WhenAll`), incluindo consultas diretas ao Postgres do teste para confirmar que os dados
-persistidos batem com o que foi enviado, não só a resposta HTTP).
+`Task.WhenAll`) e efetivação da compra via webhook simulado
+(`POST /compras/{id}/confirmar-pagamento`), incluindo consultas diretas ao Postgres do teste
+para confirmar que os dados persistidos batem com o que foi enviado, não só a resposta HTTP).
 
 `gateway` ainda só cobre o esqueleto (`GET /health`).
 
