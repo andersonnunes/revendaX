@@ -9,6 +9,11 @@ public class EfCompraRepository(VendasDbContext dbContext) : ICompraRepository
     public Task<Compra?> ObterPorIdAsync(Guid id, CancellationToken cancellationToken) =>
         dbContext.Compras.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyList<Compra>> ListarPendentesExpiradasAsync(DateTimeOffset limite, CancellationToken cancellationToken) =>
+        await dbContext.Compras
+            .Where(c => c.Status == StatusCompra.Pendente && c.CriadoEm < limite)
+            .ToListAsync(cancellationToken);
+
     public async Task AdicionarAsync(Compra compra, CancellationToken cancellationToken)
     {
         dbContext.Compras.Add(compra);
