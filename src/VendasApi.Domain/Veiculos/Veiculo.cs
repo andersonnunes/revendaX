@@ -138,6 +138,23 @@ public class Veiculo
         Status = StatusVeiculo.Vendido;
     }
 
+    /// <summary>
+    /// Libera a reserva de volta a <see cref="StatusVeiculo.Disponivel"/> (US3.5) — a compra
+    /// correspondente expirou sem pagamento. Só permitido a partir de
+    /// <see cref="StatusVeiculo.Reservado"/>: mesma defesa em profundidade de
+    /// <see cref="MarcarComoVendido"/>, reaproveitando a mesma exceção — as duas transições só
+    /// fazem sentido a partir do mesmo estado de origem.
+    /// </summary>
+    public void LiberarReserva()
+    {
+        if (Status != StatusVeiculo.Reservado)
+        {
+            throw new VeiculoNaoReservadoException();
+        }
+
+        Status = StatusVeiculo.Disponivel;
+    }
+
     private static void ValidarAnoEPreco(int ano, decimal preco)
     {
         var anoMaximo = DateTimeOffset.UtcNow.Year + 1;

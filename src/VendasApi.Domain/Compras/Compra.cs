@@ -62,4 +62,22 @@ public class Compra
 
         Status = StatusCompra.Concluida;
     }
+
+    /// <summary>
+    /// Cancela a compra por falta de pagamento dentro do prazo (US3.5) — só tem efeito a
+    /// partir de <see cref="StatusCompra.Pendente"/>; chamar sobre uma compra que já não está
+    /// mais `Pendente` (`Concluida` ou já `Cancelada`) não faz nada. Sem exceção pública, ao
+    /// contrário de <see cref="ConfirmarPagamento"/>: usado só internamente pelo job de
+    /// expiração, que já filtra por `Pendente` antes de chamar isto — idempotente por
+    /// construção, não precisa de guard que lance erro.
+    /// </summary>
+    public void Cancelar()
+    {
+        if (Status != StatusCompra.Pendente)
+        {
+            return;
+        }
+
+        Status = StatusCompra.Cancelada;
+    }
 }
