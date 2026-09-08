@@ -461,14 +461,19 @@ revendaX/
 │   └── VendasApi.Tests/             # integração (Keycloak + Postgres reais via Testcontainers)
 ├── infra/
 │   ├── docker-compose.yml
-│   └── keycloak/realm-clientes.json  # realm `clientes` exportado (US1.1)
+│   ├── keycloak/realm-clientes.json  # realm `clientes` exportado (US1.1)
+│   ├── terraform/                    # cluster kind + registry local
+│   ├── k8s/                          # manifests do que roda dentro do cluster
+│   ├── deploy.sh
+│   └── teardown.sh
 ├── docs/
 │   ├── architecture.md
 │   └── adr/
 └── .github/workflows/
     ├── ci-gateway.yml
     ├── ci-identity-api.yml
-    └── ci-vendas-api.yml
+    ├── ci-vendas-api.yml
+    └── cd-deploy.yml
 ```
 
 Cada serviço tem CI independente (`.github/workflows/ci-<servico>.yml`), disparado só por
@@ -479,3 +484,12 @@ Cada CI também **falha se a cobertura de linha ficar abaixo de 80%** (`coverlet
 `/p:Threshold=80`) — código gerado (ex.: glue do Scalar/OpenAPI, sempre em `obj/`) é excluído
 do cálculo (`/p:ExcludeByFile="**/obj/**/*.cs"`), senão o número ficaria artificialmente baixo
 sem refletir lógica de fato não testada.
+
+**`cd-deploy.yml` é o 4º workflow, e o único disparado em todo PR sem filtro de path** — os 3
+de CI só testam regra de negócio; este prova que o **deploy documentado nesta seção funciona
+de verdade**, não só que existe. Roda `./infra/deploy.sh` (o mesmo script, humano ou CI — não
+dois caminhos que podem divergir) dentro do próprio runner: sobe um cluster `kind` efêmero,
+builda e publica as 3 imagens, aplica os manifests, espera tudo pronto, confirma `/health` de
+cada serviço através do gateway, e desmancha tudo ao final (`terraform destroy`,
+`if: always()` — roda mesmo se o smoke test falhar, sem deixar cluster/registry presos no
+runner). `main` exige os 4 checks verdes, não só os 3 de CI.
