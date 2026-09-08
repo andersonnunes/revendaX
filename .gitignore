@@ -480,3 +480,12 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Terraform (infra/terraform) — estado local (US5.3): sem backend remoto, cada operador/CI
+# recria o cluster do zero, então nunca há um tfstate prévio a versionar ou reconciliar.
+# .terraform.lock.hcl continua versionado (é o arquivo que trava as versões dos providers).
+infra/terraform/.terraform/
+infra/terraform/terraform.tfstate
+infra/terraform/terraform.tfstate.*
+infra/terraform/*.tfvars
+infra/terraform/revendax-config
