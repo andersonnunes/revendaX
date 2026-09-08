@@ -1,0 +1,74 @@
+# Só alcançável de dentro do cluster (pelo gateway) — sem hostPort, mesma filosofia de porta
+# única de entrada já aplicada no docker-compose (a porta 5081 de lá é só debug direto fora de
+# container; aqui, sem "fora de container", não existe o equivalente).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: identity-api-secret
+  namespace: revendax
+type: Opaque
+stringData:
+  # Mesmo client secret de desenvolvimento definido no próprio realm-clientes.json commitado.
+  KEYCLOAK_CLIENT_SECRET: dev-identity-api-secret
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-api
+  namespace: revendax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: identity-api
+  template:
+    metadata:
+      labels:
+        app: identity-api
+    spec:
+      containers:
+        - name: identity-api
+          image: localhost:5000/identity-api:dev
+          imagePullPolicy: Always # tag fixa (:dev) — sem isso o node serviria uma imagem em cache desatualizada
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Development
+            - name: Keycloak__BaseUrl
+              value: http://keycloak:8080
+            - name: Keycloak__Realm
+              value: clientes
+            - name: Keycloak__ClientId
+              value: identity-api
+            - name: Keycloak__ClientSecret
+              valueFrom:
+                secretKeyRef:
+                  name: identity-api-secret
+                  key: KEYCLOAK_CLIENT_SECRET
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: identity-api
+  namespace: revendax
+spec:
+  selector:
+    app: identity-api
+  ports:
+    - port: 8080
+      targetPort: 8080

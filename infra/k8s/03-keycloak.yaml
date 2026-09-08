@@ -1,0 +1,110 @@
+# O ConfigMap "keycloak-realm" (com o conteúdo de infra/keycloak/realm-clientes.json) não é
+# um arquivo estático aqui — infra/deploy.sh gera ele a partir do JSON commitado antes de
+# aplicar este manifesto, pra esse arquivo continuar sendo a única fonte (evita manter uma
+# cópia colada aqui, que divergiria do original em algum momento).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: keycloak-admin-secret
+  namespace: revendax
+type: Opaque
+stringData:
+  # Mesmas credenciais de desenvolvimento local já usadas no docker-compose — não é segredo
+  # de produção, é o admin de um Keycloak efêmero só acessível dentro do próprio cluster local.
+  KC_BOOTSTRAP_ADMIN_USERNAME: admin
+  KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: revendax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  # RollingUpdate (o padrão) tenta subir o pod novo antes de derrubar o velho — os dois
+  # tentando ocupar o mesmo hostPort (8081) no único node do cluster trava o pod novo em
+  # Pending pra sempre (confirmado rodando de verdade um redeploy). Recreate evita a sobreposição.
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.0
+          args: ["start-dev", "--import-realm"]
+          envFrom:
+            - secretRef:
+                name: keycloak-admin-secret
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://keycloak-db:5432/keycloak
+            - name: KC_DB_USERNAME
+              value: keycloak
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db-secret
+                  key: POSTGRES_PASSWORD
+            # Mesmo racional do docker-compose: fixa o hostname usado no claim `iss` dos
+            # tokens. `identity-api`/`vendas-api` alcançam o Keycloak pelo nome do Service
+            # ("keycloak", resolvido via DNS do cluster) — igual ao hostname interno do Docker
+            # que o docker-compose já usa, só troca o mecanismo de rede por baixo.
+            - name: KC_HOSTNAME
+              value: http://keycloak:8080
+            - name: KC_HOSTNAME_STRICT
+              value: "true"
+          ports:
+            - containerPort: 8080
+              hostPort: 8081 # extraPortMappings do kind (infra/terraform/cluster.tf) espera isso aqui
+          volumeMounts:
+            - name: realm
+              mountPath: /opt/keycloak/data/import/realm-clientes.json
+              subPath: realm-clientes.json
+              readOnly: true
+          # Keycloak em modo dev não expõe /health por padrão (exigiria uma env nova, fora do
+          # que o docker-compose já configura) — TCP no próprio 8080 é suficiente pra saber se
+          # o processo está de pé, mesmo padrão de simplicidade já usado no resto do cluster.
+          #
+          # `--import-realm` faz a importação do realm-clientes.json rodar antes do Keycloak
+          # abrir a porta HTTP — na prática, bem mais que os 30s que a primeira versão deste
+          # probe assumia (confirmado rodando de verdade: com 30s de delay, a liveness matava
+          # o container em plena importação, ciclo de restart sem nunca ficar pronto).
+          # `failureThreshold` maior dá folga a mais pra variação de máquina pra máquina.
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            failureThreshold: 6
+      volumes:
+        - name: realm
+          configMap:
+            name: keycloak-realm
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: revendax
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - port: 8080
+      targetPort: 8080

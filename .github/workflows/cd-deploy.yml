@@ -1,0 +1,45 @@
+name: CD - deploy (Terraform + kind)
+
+# Sem paths-filter, ao contrário dos 3 workflows de CI por serviço — não existe "deployar só o
+# vendas-api" isoladamente num cluster Kubernetes coeso; qualquer mudança precisa provar que o
+# sistema inteiro ainda sobe através do mesmo `infra/deploy.sh` documentado no README, não uma
+# simulação separada dele.
+on:
+  pull_request:
+
+jobs:
+  deploy-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.5"
+
+      - uses: azure/setup-kubectl@v4
+
+      # kind não precisa de instalação à parte — o provider Terraform (infra/terraform/) fala
+      # com o Docker diretamente, não invoca o binário `kind`.
+
+      - name: Deploy (mesmo script usado localmente)
+        run: ./infra/deploy.sh
+
+      # /health de cada serviço através do gateway — prova que o deploy funciona (cluster sobe,
+      # imagens builda/publicam, manifests aplicam, roteamento do YARP funciona), não que a
+      # regra de negócio funciona (isso já é coberto pelos 3 workflows de CI, com Testcontainers
+      # reais — reexecutar a suíte de integração aqui misturaria dois mundos de teste sem
+      # necessidade clara).
+      - name: Smoke test (via gateway)
+        run: |
+          set -euo pipefail
+          curl -sf http://localhost:8080/health
+          curl -sf http://localhost:8080/identity/health
+          curl -sf http://localhost:8080/vendas/health
+          echo "OK — os 3 serviços respondem através do gateway no cluster kind."
+
+      # Sempre roda, mesmo se o deploy ou o smoke test falharem acima — sem isso, um cluster
+      # kind (e o container do registry) ficaria preso no runner numa falha no meio do processo.
+      - name: Teardown
+        if: always()
+        run: ./infra/teardown.sh

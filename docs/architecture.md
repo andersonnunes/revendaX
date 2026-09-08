@@ -2,7 +2,9 @@
 
 Plataforma para uma revendedora de veículos automotores vender online, construída para o
 Trabalho Substitutivo de Tech Challenge (Fase 3, curso SOAT — PósTech/FIAP). Este documento
-descreve a arquitetura **planejada**, antes da implementação em si.
+descreve a arquitetura **implementada** — os Épicos 1 a 3 (identidade, veículos, compras)
+estão completos; onde algo ainda é planejado, não implementado, o texto diz isso
+explicitamente.
 
 > O backlog e o detalhamento de cada história (critérios de aceite, cenários de teste) são
 > material de planejamento da atividade acadêmica e **não fazem parte deste repositório** —
@@ -14,7 +16,8 @@ descreve a arquitetura **planejada**, antes da implementação em si.
 - [C4 — Nível 1: Contexto](#c4--nível-1-contexto)
 - [C4 — Nível 2: Containers](#c4--nível-2-containers)
 - [Fluxo ponta-a-ponta (demonstração)](#fluxo-ponta-a-ponta-demonstração)
-- [Database per Service](#database-per-service)
+- [Modelagem de dados](#modelagem-de-dados)
+- [Deploy](#deploy)
 - [Decisões de arquitetura (ADRs)](#decisões-de-arquitetura-adrs)
 
 ---
@@ -142,7 +145,7 @@ sequenceDiagram
 
 ---
 
-## Database per Service
+## Modelagem de dados
 
 ```
 clientes (via Keycloak)  → identity-api   (credenciais e dados pessoais do cliente)
@@ -152,10 +155,86 @@ vendas                    → vendas-api     (veículos + compras — write mode
 Dois bancos lógicos isolados — nenhum serviço acessa o banco do outro. `vendas-api` mantém
 veículos e compras no **mesmo** schema/transação porque pertencem ao mesmo serviço (decisão
 de [ADR-0002](adr/0002-dois-servicos-identity-vendas.md)): isso também simplifica a regra de
-concorrência da US3.2 (reservar um veículo e criar o pedido cabem numa única transação local,
+concorrência da US3.2 (reservar um veículo e criar a compra cabem numa única transação local,
 sem precisar de transação distribuída entre serviços).
 
+### `vendas-api` (Postgres) — nível de campo
+
+```mermaid
+erDiagram
+    VEICULO ||--o{ COMPRA : "veiculoId"
+    VEICULO {
+        guid Id PK
+        string Marca
+        string Modelo
+        int Ano
+        string Cor
+        decimal Preco
+        string Placa UK "formato antigo (AAA9999) ou Mercosul (AAA9A99)"
+        string Status "Disponivel | Reservado | Vendido"
+        bool Ativo "soft delete — US2.5, independente de Status"
+        datetimeoffset CriadoEm
+    }
+    COMPRA {
+        guid Id PK
+        guid VeiculoId FK
+        string ClienteId "sub do token — não é FK real, ver abaixo"
+        decimal Preco "snapshot do preço do veículo no momento da compra"
+        string Status "Pendente | Concluida | Cancelada"
+        datetimeoffset CriadoEm
+    }
+```
+
+Um veículo pode ter mais de uma `Compra` ao longo do tempo (`||--o{`, não `||--o|`) — ex.: uma
+`Cancelada` pela expiração automática (US3.5) seguida de uma nova compra bem-sucedida pra o
+mesmo veículo, depois dele voltar a `Disponivel`.
+
+**`Compra.ClienteId` não é uma foreign key de verdade — é aqui que a separação entre
+identidade e vendas aparece no nível de dado, não só de container.** `vendas-api` não tem, e
+nunca teve, uma tabela `Cliente` própria: `ClienteId` é uma `string` opaca que só *coincide*,
+por convenção, com o `sub` (claim do JWT) que o Keycloak emite — não há constraint de
+integridade referencial no Postgres ligando as duas coisas, porque não há nada do lado de
+`vendas-api` pra referenciar. Confirmar que um `ClienteId` corresponde a um cliente de verdade
+é responsabilidade do Keycloak (validação de token, [ADR-0001](adr/0001-keycloak-como-provedor-de-identidade.md)),
+não do schema deste serviço.
+
+### Cliente (`identity-api`) — mapeamento pro Keycloak, não uma tabela
+
+`identity-api` não tem banco próprio — todo dado de cliente vira campo nativo ou *attribute*
+customizado de um usuário do Keycloak (confirmado lendo `KeycloakClienteProvider.cs`, não
+presumido):
+
+| Campo do cadastro | Onde vai no Keycloak | Nativo ou customizado |
+|---|---|---|
+| `Nome` | `firstName` | Nativo (sem `lastName` — não usado) |
+| `Email` | `username` **e** `email` | Nativo |
+| `Senha` | `credentials[0]` (`type: password`, `temporary: false`) | Nativo |
+| `Cpf` | `attributes["cpf"]` | Customizado (Keycloak não tem CPF nativo) |
+| `Telefone` (opcional) | `attributes["telefone"]` | Customizado |
+
+Sem campo `endereco` — não existe no comando real (`CriarClienteCommand`); só é exigido mais
+adiante, no momento da compra (US3.1). `attributes` é um dicionário livre por realm que o
+Keycloak permite estender — é o mecanismo, não uma tabela paralela mantida por este projeto.
+
 ---
+
+## Deploy
+
+Alvo local: **cluster Kubernetes via `kind`, provisionado por Terraform**
+(`infra/terraform/`) — não nuvem paga, não Docker Compose sozinho (não é IaC: nada ali
+provisiona infraestrutura, só orquestra containers já existentes na máquina). Terraform cuida
+só do que precisa existir *antes* de qualquer container da aplicação — o cluster em si e um
+registry Docker local; o que roda dentro do cluster é YAML puro (`infra/k8s/`), aplicado via
+`kubectl`, não recursos Terraform de Kubernetes (evita o problema conhecido de configurar esse
+provider a partir de um kubeconfig que só existe depois do cluster já criado).
+
+Os 7 serviços do `docker-compose.yml` (gateway, identity-api, vendas-api, Keycloak, Keycloak
+DB, vendas DB, Mailpit) viram 7 pares `Deployment`+`Service` no cluster, um namespace dedicado
+(`revendax`), `PersistentVolumeClaim` pros dois Postgres e as mesmas portas expostas de sempre
+(`8080` gateway, `8081` Keycloak, `8025` Mailpit) via `extraPortMappings` do próprio `kind` —
+sem Ingress controller, um único node não justifica essa camada a mais. `docker-compose.yml`
+continua existindo, sem mudança: é o caminho rápido pra desenvolvimento local; o cluster
+`kind` é o alvo de "deploy automatizado" propriamente dito.
 
 ## Decisões de arquitetura (ADRs)
 
