@@ -102,6 +102,27 @@ docker compose -f infra/docker-compose.yml up --build
 > `docker compose -f infra/docker-compose.yml down -v && docker compose -f
 > infra/docker-compose.yml up --build` para forçar reimportação limpa.
 
+**Deploy automatizado (Terraform + Kubernetes via `kind`)** — o mesmo sistema, rodando num
+cluster Kubernetes local em vez de containers soltos do Compose. Pré-requisitos:
+[Terraform](https://developer.hashicorp.com/terraform/install) e
+[`kubectl`](https://kubernetes.io/docs/tasks/tools/#kubectl); o binário `kind` em si **não**
+precisa estar instalado à parte — o provider Terraform usado (`tehcyx/kind`) fala com o Docker
+diretamente:
+
+```bash
+./infra/deploy.sh
+# gateway:  http://localhost:8080/health
+# keycloak: http://localhost:8081
+# mailpit:  http://localhost:8025
+```
+
+Um comando só: provisiona o cluster e um registry Docker local (Terraform), builda e publica
+as 3 imagens do projeto nesse registry, aplica os manifests (`infra/k8s/`) e espera todos os
+`Deployment`s ficarem prontos. Mesmas portas de sempre — os exemplos `curl
+http://localhost:8080/...` deste README funcionam sem editar nada, só troca o que está por
+trás da porta. `./infra/teardown.sh` desmancha tudo (cluster + registry), sem sobra de
+container/rede/volume na máquina.
+
 ## Testar o cadastro de cliente (US1.1)
 
 Com a stack no ar (`docker compose up`, acima):

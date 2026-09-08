@@ -15,6 +15,7 @@ descreve a arquitetura **planejada**, antes da implementação em si.
 - [C4 — Nível 2: Containers](#c4--nível-2-containers)
 - [Fluxo ponta-a-ponta (demonstração)](#fluxo-ponta-a-ponta-demonstração)
 - [Database per Service](#database-per-service)
+- [Deploy](#deploy)
 - [Decisões de arquitetura (ADRs)](#decisões-de-arquitetura-adrs)
 
 ---
@@ -156,6 +157,24 @@ concorrência da US3.2 (reservar um veículo e criar o pedido cabem numa única 
 sem precisar de transação distribuída entre serviços).
 
 ---
+
+## Deploy
+
+Alvo local: **cluster Kubernetes via `kind`, provisionado por Terraform**
+(`infra/terraform/`) — não nuvem paga, não Docker Compose sozinho (não é IaC: nada ali
+provisiona infraestrutura, só orquestra containers já existentes na máquina). Terraform cuida
+só do que precisa existir *antes* de qualquer container da aplicação — o cluster em si e um
+registry Docker local; o que roda dentro do cluster é YAML puro (`infra/k8s/`), aplicado via
+`kubectl`, não recursos Terraform de Kubernetes (evita o problema conhecido de configurar esse
+provider a partir de um kubeconfig que só existe depois do cluster já criado).
+
+Os 7 serviços do `docker-compose.yml` (gateway, identity-api, vendas-api, Keycloak, Keycloak
+DB, vendas DB, Mailpit) viram 7 pares `Deployment`+`Service` no cluster, um namespace dedicado
+(`revendax`), `PersistentVolumeClaim` pros dois Postgres e as mesmas portas expostas de sempre
+(`8080` gateway, `8081` Keycloak, `8025` Mailpit) via `extraPortMappings` do próprio `kind` —
+sem Ingress controller, um único node não justifica essa camada a mais. `docker-compose.yml`
+continua existindo, sem mudança: é o caminho rápido pra desenvolvimento local; o cluster
+`kind` é o alvo de "deploy automatizado" propriamente dito.
 
 ## Decisões de arquitetura (ADRs)
 
