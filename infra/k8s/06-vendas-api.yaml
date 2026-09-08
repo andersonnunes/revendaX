@@ -1,0 +1,75 @@
+# Só alcançável de dentro do cluster (pelo gateway) — mesma razão do identity-api.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vendas-api-secret
+  namespace: revendax
+type: Opaque
+stringData:
+  # String de conexão completa (contém a senha do vendas-db) e o segredo do webhook de
+  # confirmação de pagamento — mesmos valores de desenvolvimento do docker-compose.
+  CONNECTION_STRING_VENDAS_DB: "Host=vendas-db;Port=5432;Database=vendas;Username=vendas;Password=vendas"
+  WEBHOOK_SECRET: dev-webhook-secret
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vendas-api
+  namespace: revendax
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vendas-api
+  template:
+    metadata:
+      labels:
+        app: vendas-api
+    spec:
+      containers:
+        - name: vendas-api
+          image: localhost:5000/vendas-api:dev
+          imagePullPolicy: Always
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Development
+            - name: Keycloak__BaseUrl
+              value: http://keycloak:8080
+            - name: ConnectionStrings__VendasDb
+              valueFrom:
+                secretKeyRef:
+                  name: vendas-api-secret
+                  key: CONNECTION_STRING_VENDAS_DB
+            - name: Pagamentos__WebhookSecret
+              valueFrom:
+                secretKeyRef:
+                  name: vendas-api-secret
+                  key: WEBHOOK_SECRET
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vendas-api
+  namespace: revendax
+spec:
+  selector:
+    app: vendas-api
+  ports:
+    - port: 8080
+      targetPort: 8080
